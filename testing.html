@@ -23,45 +23,50 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Add OrbitControls to rotate the Earth
+    // Add OrbitControls to allow rotating the Earth
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-    // Create the Earth texture (use URLs that should be accessible)
+    // Load textures
     const textureLoader = new THREE.TextureLoader();
-    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth.jpg', function() {
-        animate();  // Start the animation once the texture is loaded
+
+    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth.jpg', () => {
+      console.log("Earth texture loaded successfully");
+      animate(); // Start the animation after the texture is loaded
+    }, undefined, (error) => {
+      console.error("Error loading Earth texture:", error);
     });
-    
+
+    const earthMaterial = new THREE.MeshStandardMaterial({ map: earthTexture });
+
     // Create a sphere for the Earth
     const geometry = new THREE.SphereGeometry(5, 32, 32);
-    const material = new THREE.MeshStandardMaterial({ map: earthTexture });
-    const earth = new THREE.Mesh(geometry, material);
+    const earth = new THREE.Mesh(geometry, earthMaterial);
     scene.add(earth);
 
-    // Set up lighting to make Earth visible
-    const ambientLight = new THREE.AmbientLight(0x404040);  // Soft white light
+    // Set up lighting to illuminate the Earth
+    const ambientLight = new THREE.AmbientLight(0x444444);  // Soft ambient light for general illumination
     scene.add(ambientLight);
 
     const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-    pointLight.position.set(10, 10, 10);  // Position light to simulate sunlight
+    pointLight.position.set(10, 10, 10);  // Simulate sunlight
     scene.add(pointLight);
 
-    // Position the camera so we can see the Earth
+    // Position the camera far enough to view the Earth
     camera.position.z = 15;
 
     // Function to update the day/night cycle and rotate the Earth
     function animate() {
       requestAnimationFrame(animate);
 
-      // Rotate the Earth
-      earth.rotation.y += 0.002;  // Slowly rotate the Earth
+      // Rotate the Earth slowly
+      earth.rotation.y += 0.002;
 
-      // Simulate the Sun's position (move light around the Earth to simulate day/night)
+      // Simulate the Sun's movement (rotate the point light around the Earth)
       const timeOfDay = earth.rotation.y / (2 * Math.PI);
       pointLight.position.x = Math.cos(timeOfDay * 2 * Math.PI) * 20;
       pointLight.position.z = Math.sin(timeOfDay * 2 * Math.PI) * 20;
 
-      // Update controls to allow user interaction
+      // Update OrbitControls
       controls.update();
 
       // Render the scene
