@@ -17,6 +17,7 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0xffffff, 1);  // Set background to white
         document.body.appendChild(renderer.domElement);
 
         // Create a 3D Sphere
@@ -43,15 +44,29 @@
         // Camera positioning
         camera.position.z = 5;
 
-        // Controls (Rotate and Zoom)
-        let mouseX = 0;
-        let mouseY = 0;
-        const speed = 0.05;
-        const mouse = new THREE.Vector2();
+        // Keyboard controls for rotating the sphere
+        let rotationSpeed = 0.05;
+        let cameraRotationSpeed = 0.1;
 
-        document.addEventListener('mousemove', (event) => {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        document.addEventListener('keydown', (event) => {
+            switch (event.key) {
+                case 'w': // Forward
+                case 'ArrowUp':
+                    sphere.rotation.x += rotationSpeed;
+                    break;
+                case 's': // Backward
+                case 'ArrowDown':
+                    sphere.rotation.x -= rotationSpeed;
+                    break;
+                case 'a': // Left
+                case 'ArrowLeft':
+                    sphere.rotation.y += rotationSpeed;
+                    break;
+                case 'd': // Right
+                case 'ArrowRight':
+                    sphere.rotation.y -= rotationSpeed;
+                    break;
+            }
         });
 
         // Handle window resize
@@ -65,13 +80,9 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Rotate the sphere and camera
-            sphere.rotation.x += 0.01;
-            sphere.rotation.y += 0.01;
-
-            camera.position.x += (mouse.x * speed - camera.position.x) * 0.05;
-            camera.position.y += (-mouse.y * speed - camera.position.y) * 0.05;
-            camera.lookAt(scene.position);
+            // Rotate the sphere continuously by default
+            // sphere.rotation.x += 0.01;
+            // sphere.rotation.y += 0.01;
 
             renderer.render(scene, camera);
         }
