@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HEHEH :3</title>
+  <title>Interactive 3D Earth</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
   </style>
 </head>
 <body>
-  <!-- The canvas where the 3D Earth will be displayed -->
   <canvas id="earthCanvas"></canvas>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -27,49 +26,47 @@
     // Add OrbitControls to rotate the Earth
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-    // Create the Earth texture
+    // Create the Earth texture (use URLs that should be accessible)
     const textureLoader = new THREE.TextureLoader();
-    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth.jpg');
-    const normalMap = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth_normal.jpg');
-    const specularMap = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth_specular.jpg');
-
+    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth.jpg', function() {
+        animate();  // Start the animation once the texture is loaded
+    });
+    
     // Create a sphere for the Earth
     const geometry = new THREE.SphereGeometry(5, 32, 32);
-    const material = new THREE.MeshStandardMaterial({
-      map: earthTexture,
-      normalMap: normalMap,
-      specularMap: specularMap
-    });
-
+    const material = new THREE.MeshStandardMaterial({ map: earthTexture });
     const earth = new THREE.Mesh(geometry, material);
     scene.add(earth);
 
-    // Set up lighting to make Earth look realistic
-    const ambientLight = new THREE.AmbientLight(0x444444);
+    // Set up lighting to make Earth visible
+    const ambientLight = new THREE.AmbientLight(0x404040);  // Soft white light
     scene.add(ambientLight);
 
     const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-    pointLight.position.set(0, 0, 10);
+    pointLight.position.set(10, 10, 10);  // Position light to simulate sunlight
     scene.add(pointLight);
 
-    // Position the camera
+    // Position the camera so we can see the Earth
     camera.position.z = 15;
 
     // Function to update the day/night cycle and rotate the Earth
     function animate() {
       requestAnimationFrame(animate);
-      
-      // Rotate the Earth
-      earth.rotation.y += 0.002;
 
-      // Update OrbitControls
+      // Rotate the Earth
+      earth.rotation.y += 0.002;  // Slowly rotate the Earth
+
+      // Simulate the Sun's position (move light around the Earth to simulate day/night)
+      const timeOfDay = earth.rotation.y / (2 * Math.PI);
+      pointLight.position.x = Math.cos(timeOfDay * 2 * Math.PI) * 20;
+      pointLight.position.z = Math.sin(timeOfDay * 2 * Math.PI) * 20;
+
+      // Update controls to allow user interaction
       controls.update();
 
       // Render the scene
       renderer.render(scene, camera);
     }
-
-    animate();
 
     // Handle window resizing
     window.addEventListener('resize', () => {
