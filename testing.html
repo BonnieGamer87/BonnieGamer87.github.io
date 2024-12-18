@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HEHEH :3</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- The canvas where the 3D Earth will be displayed -->
+  <canvas id="earthCanvas"></canvas>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+
+  <script>
+    // Set up scene, camera, and renderer
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('earthCanvas') });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Add OrbitControls to rotate the Earth
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+    // Create the Earth texture
+    const textureLoader = new THREE.TextureLoader();
+    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth.jpg');
+    const normalMap = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth_normal.jpg');
+    const specularMap = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth_specular.jpg');
+
+    // Create a sphere for the Earth
+    const geometry = new THREE.SphereGeometry(5, 32, 32);
+    const material = new THREE.MeshStandardMaterial({
+      map: earthTexture,
+      normalMap: normalMap,
+      specularMap: specularMap
+    });
+
+    const earth = new THREE.Mesh(geometry, material);
+    scene.add(earth);
+
+    // Set up lighting to make Earth look realistic
+    const ambientLight = new THREE.AmbientLight(0x444444);
+    scene.add(ambientLight);
+
+    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+    pointLight.position.set(0, 0, 10);
+    scene.add(pointLight);
+
+    // Position the camera
+    camera.position.z = 15;
+
+    // Function to update the day/night cycle and rotate the Earth
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Rotate the Earth
+      earth.rotation.y += 0.002;
+
+      // Update OrbitControls
+      controls.update();
+
+      // Render the scene
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Handle window resizing
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+  </script>
+</body>
+</html>
