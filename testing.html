@@ -1,90 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive 3D Earth</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Sphere with Spotlight</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-  <canvas id="earthCanvas"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/OrbitControls.js"></script>
+        // Create a 3D Sphere
+        const geometry = new THREE.SphereGeometry(1, 32, 32);  // Radius, widthSegments, heightSegments
+        const material = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.5, metalness: 0.5 });
+        const sphere = new THREE.Mesh(geometry, material);
+        scene.add(sphere);
 
-  <script>
-    // Set up scene, camera, and renderer
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('earthCanvas') });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+        // Spotlight
+        const spotlight = new THREE.SpotLight(0xffffff, 1);
+        spotlight.position.set(5, 5, 5); // Spotlight position
+        spotlight.castShadow = true; // Enable shadow from spotlight
+        scene.add(spotlight);
 
-    // Add OrbitControls to allow rotating the Earth
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        // Ground plane for context (optional)
+        const planeGeometry = new THREE.PlaneGeometry(500, 500);
+        const planeMaterial = new THREE.ShadowMaterial({ opacity: 0.5 });
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = -Math.PI / 2;  // Rotate the plane
+        plane.position.y = -1;  // Move the plane below the sphere
+        plane.receiveShadow = true;
+        scene.add(plane);
 
-    // Load textures
-    const textureLoader = new THREE.TextureLoader();
+        // Camera positioning
+        camera.position.z = 5;
 
-    const earthTexture = textureLoader.load('https://raw.githubusercontent.com/davidjbradshaw/3d-geojson/main/earth.jpg', () => {
-      console.log("Earth texture loaded successfully");
-      animate(); // Start the animation after the texture is loaded
-    }, undefined, (error) => {
-      console.error("Error loading Earth texture:", error);
-    });
+        // Controls (Rotate and Zoom)
+        let mouseX = 0;
+        let mouseY = 0;
+        const speed = 0.05;
+        const mouse = new THREE.Vector2();
 
-    const earthMaterial = new THREE.MeshStandardMaterial({ map: earthTexture });
+        document.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
 
-    // Create a sphere for the Earth
-    const geometry = new THREE.SphereGeometry(5, 32, 32);
-    const earth = new THREE.Mesh(geometry, earthMaterial);
-    scene.add(earth);
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-    // Set up lighting to illuminate the Earth
-    const ambientLight = new THREE.AmbientLight(0x444444);  // Soft ambient light for general illumination
-    scene.add(ambientLight);
+        // Animate the scene (rotate and zoom)
+        function animate() {
+            requestAnimationFrame(animate);
 
-    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-    pointLight.position.set(10, 10, 10);  // Simulate sunlight
-    scene.add(pointLight);
+            // Rotate the sphere and camera
+            sphere.rotation.x += 0.01;
+            sphere.rotation.y += 0.01;
 
-    // Enable shadows
-    renderer.shadowMap.enabled = true;
-    pointLight.castShadow = true;
-    earth.castShadow = true;
-    earth.receiveShadow = true;
+            camera.position.x += (mouse.x * speed - camera.position.x) * 0.05;
+            camera.position.y += (-mouse.y * speed - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
 
-    // Position the camera far enough to view the Earth
-    camera.position.z = 15;
+            renderer.render(scene, camera);
+        }
 
-    // Function to update the day/night cycle and rotate the Earth
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // Rotate the Earth slowly
-      earth.rotation.y += 0.002;
-
-      // Simulate the Sun's movement (rotate the point light around the Earth)
-      const timeOfDay = earth.rotation.y / (2 * Math.PI);
-      pointLight.position.x = Math.cos(timeOfDay * 2 * Math.PI) * 20;
-      pointLight.position.z = Math.sin(timeOfDay * 2 * Math.PI) * 20;
-
-      // Update OrbitControls
-      controls.update();
-
-      // Render the scene
-      renderer.render(scene, camera);
-    }
-
-    // Handle window resizing
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    });
-  </script>
+        animate();
+    </script>
 </body>
 </html>
