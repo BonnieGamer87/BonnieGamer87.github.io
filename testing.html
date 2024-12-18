@@ -13,7 +13,7 @@
   <canvas id="earthCanvas"></canvas>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/OrbitControls.js"></script>
 
   <script>
     // Set up scene, camera, and renderer
@@ -50,6 +50,12 @@
     const pointLight = new THREE.PointLight(0xffffff, 1, 100);
     pointLight.position.set(10, 10, 10);  // Simulate sunlight
     scene.add(pointLight);
+
+    // Enable shadows
+    renderer.shadowMap.enabled = true;
+    pointLight.castShadow = true;
+    earth.castShadow = true;
+    earth.receiveShadow = true;
 
     // Position the camera far enough to view the Earth
     camera.position.z = 15;
