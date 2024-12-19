@@ -20,7 +20,7 @@
         renderer.setClearColor(0xffffff, 1);  // Set background to white
         document.body.appendChild(renderer.domElement);
 
-        // Create a 3D Sphere
+        // Create a 3D Sphere (Earth-like)
         const geometry = new THREE.SphereGeometry(1, 32, 32);  // Radius, widthSegments, heightSegments
         const material = new THREE.MeshStandardMaterial({ color: 0x0077ff, roughness: 0.5, metalness: 0.5 });
         const sphere = new THREE.Mesh(geometry, material);
@@ -80,9 +80,8 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Rotate the sphere continuously by default
-            // sphere.rotation.x += 0.01;
-            // sphere.rotation.y += 0.01;
+            // Rotate the sphere continuously like Earth
+            sphere.rotation.y += 0.005;  // Slow rotation like Earth (around its Y-axis)
 
             renderer.render(scene, camera);
         }
