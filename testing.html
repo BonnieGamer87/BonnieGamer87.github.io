@@ -3,91 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rotating 3D Sphere with Galaxy Background</title>
+    <title>Three.js Example</title>
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; }
         canvas { display: block; }
     </style>
 </head>
 <body>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // Set up the scene, camera, and renderer
+        // Scene setup
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true; // Enable shadow maps
         document.body.appendChild(renderer.domElement);
 
-        // Set galaxy background with a black-purple color gradient
-        scene.background = new THREE.Color(0x120f1e);  // Dark purple background
-
-        // Create stars using points
-        const starGeometry = new THREE.BufferGeometry();
-        const starCount = 10000;
-        const starPositions = [];
-
-        // Generate random stars
-        for (let i = 0; i < starCount; i++) {
-            const x = (Math.random() - 0.5) * 2000;  // Random X position
-            const y = (Math.random() - 0.5) * 2000;  // Random Y position
-            const z = (Math.random() - 0.5) * 2000;  // Random Z position
-            starPositions.push(x, y, z);
-        }
-
-        // Create a points material for stars
-        const starMaterial = new THREE.PointsMaterial({
-            color: 0xffffff,  // Star color (white)
-            size: 1,  // Set a constant size for all stars
-            opacity: 0.7,  // Set a constant opacity for all stars
-            transparent: true
-        });
-
-        // Add stars to the scene
-        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
-        const stars = new THREE.Points(starGeometry, starMaterial);
-        scene.add(stars);
-
-        // Load the texture for the sphere
-        const textureLoader = new THREE.TextureLoader();
-        const sphereTexture = textureLoader.load('test3.png');
-        
-        // Create a sphere geometry and apply the texture
+        // Create a sphere geometry and a basic material for it
         const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
-        const sphereMaterial = new THREE.MeshBasicMaterial({ map: sphereTexture });
+        const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x0077ff }); // Standard material reacts to light
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         scene.add(sphere);
 
-        // Add a spotlight to the left (position it to the left of the sphere)
-        const spotlight = new THREE.SpotLight(0xFFA500); // Orange color
-        spotlight.position.set(-5, 0, 2); // Position to the left of the scene
-        spotlight.intensity = 1; // 100% brightness
-        spotlight.castShadow = true;
-        spotlight.target = sphere; // Make the spotlight target the sphere
-        scene.add(spotlight);
+        // Add a directional light to illuminate the sphere
+        const light = new THREE.DirectionalLight(0xffffff, 1); // White light with intensity 1
+        light.position.set(5, 5, 5); // Position the light in the scene
+        scene.add(light);
 
-        // Position the camera
-        camera.position.z = 4;  // Adjusted camera position to ensure sphere is visible
+        // Ambient light for soft illumination
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
+        scene.add(ambientLight);
 
-        // Animation loop to rotate the sphere and animate the stars
+        // Set initial camera position
+        camera.position.z = 5;
+
+        // Camera movement speed
+        let moveSpeed = 0.1;
+
+        // Listen for keydown events to move the camera
+        window.addEventListener('keydown', (event) => {
+            switch (event.key) {
+                case 'w':  // Move forward
+                    camera.position.z -= moveSpeed;
+                    break;
+                case 's':  // Move backward
+                    camera.position.z += moveSpeed;
+                    break;
+                case 'a':  // Move left
+                    camera.position.x -= moveSpeed;
+                    break;
+                case 'd':  // Move right
+                    camera.position.x += moveSpeed;
+                    break;
+            }
+        });
+
+        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            
-            // Rotate the sphere around the Y-axis (left and right)
-            sphere.rotation.y += 0.001; // Adjust this value to change the speed
 
-            // Rotate the stars to create a moving background effect (optional)
-            stars.rotation.x += 0.00001; // Slow rotation for stars
-            stars.rotation.y += 0.00001;
+            // Optional: Rotate the sphere for a nice effect
+            sphere.rotation.x += 0.01;
+            sphere.rotation.y += 0.01;
 
-            // Render the scene
+            // Render the scene from the perspective of the camera
             renderer.render(scene, camera);
         }
 
-        animate();
+        animate(); // Start the animation loop
 
-        // Adjust the camera aspect ratio and renderer size on window resize
+        // Handle window resizing
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);
             camera.aspect = window.innerWidth / window.innerHeight;
