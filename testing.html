@@ -17,6 +17,7 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Enable shadow maps
         document.body.appendChild(renderer.domElement);
 
         // Set galaxy background with a black-purple color gradient
@@ -38,8 +39,8 @@
         // Create a points material for stars
         const starMaterial = new THREE.PointsMaterial({
             color: 0xffffff,  // Star color (white)
-            size: Math.random() * 0.5 + 0.5,  // Random star size
-            opacity: Math.random() * 0.8 + 0.2,  // Random opacity
+            size: 1,  // Set a constant size for all stars
+            opacity: 0.7,  // Set a constant opacity for all stars
             transparent: true
         });
 
@@ -54,7 +55,7 @@
         
         // Create a sphere geometry and apply the texture
         const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
-        const sphereMaterial = new THREE.MeshBasicMaterial({ map: sphereTexture });  // Use the texture here
+        const sphereMaterial = new THREE.MeshBasicMaterial({ map: sphereTexture });
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         scene.add(sphere);
 
@@ -67,7 +68,7 @@
         scene.add(spotlight);
 
         // Position the camera
-        camera.position.z = 2;
+        camera.position.z = 4;  // Adjusted camera position to ensure sphere is visible
 
         // Animation loop to rotate the sphere and animate the stars
         function animate() {
