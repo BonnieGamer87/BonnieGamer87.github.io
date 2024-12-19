@@ -86,22 +86,22 @@
         function handleKeyboard(event) {
             switch (event.key) {
                 case 'w':
-                    velocity.z = -moveSpeed; // Move camera forward
+                    velocity.set(0, 0, -moveSpeed); // Move camera forward (relative to camera)
                     break;
                 case 's':
-                    velocity.z = moveSpeed; // Move camera backward
+                    velocity.set(0, 0, moveSpeed); // Move camera backward (relative to camera)
                     break;
                 case 'a':
-                    velocity.x = -moveSpeed; // Move camera left
+                    velocity.set(-moveSpeed, 0, 0); // Move camera left (relative to camera)
                     break;
                 case 'd':
-                    velocity.x = moveSpeed; // Move camera right
+                    velocity.set(moveSpeed, 0, 0); // Move camera right (relative to camera)
                     break;
                 case ' ':
-                    velocity.y = moveSpeed; // Move camera up (space bar)
+                    velocity.set(0, moveSpeed, 0); // Move camera up (space bar)
                     break;
                 case 'Shift':
-                    velocity.y = -moveSpeed; // Move camera down (shift)
+                    velocity.set(0, -moveSpeed, 0); // Move camera down (shift)
                     break;
                 case 'q':
                     rotationVelocity = rotationSpeed; // Rotate camera down around X-axis
@@ -135,11 +135,23 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Apply smooth movement
-            camera.position.add(velocity); // Update position smoothly
+            // Apply smooth movement relative to camera's orientation
+            const direction = new THREE.Vector3(0, 0, 1); // Forward direction vector
+            const up = new THREE.Vector3(0, 1, 0); // Up direction vector
+            const right = new THREE.Vector3(1, 0, 0); // Right direction vector
+
+            // Get the camera's current direction vectors based on its rotation
+            camera.getWorldDirection(direction); // Update the direction vector based on camera rotation
+            camera.up.copy(up); // Update the up vector
+            camera.right = new THREE.Vector3().crossVectors(camera.up, direction); // Calculate right vector
+
+            // Apply movement based on the camera's current rotation
+            camera.position.addScaledVector(velocity.z * direction, 1); // Move forward/backward
+            camera.position.addScaledVector(velocity.x * camera.right, 1); // Move left/right
+            camera.position.addScaledVector(velocity.y * up, 1); // Move up/down
 
             // Apply smooth rotation (around X-axis)
-            camera.rotation.y += rotationVelocity; // Rotate camera around X-axis
+            camera.rotation.x += rotationVelocity; // Rotate camera around X-axis
 
             // Rotate the sphere around the Y-axis (left and right)
             sphere.rotation.y += 0.001; // Adjust this value to change the speed
