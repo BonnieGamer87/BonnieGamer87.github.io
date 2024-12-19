@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js Example</title>
+    <title>Three.js Example with Texture and Stars</title>
     <style>
-        body { margin: 0; }
+        body { margin: 0; overflow: hidden; }
         canvas { display: block; }
     </style>
 </head>
@@ -19,18 +19,31 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Create a sphere geometry and a basic material for it
+        // Create a sphere geometry for the object
         const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
-        const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0x0077ff }); // Standard material reacts to light
+        
+        // Load a texture and apply it to the sphere
+        const textureLoader = new THREE.TextureLoader();
+        const sphereTexture = textureLoader.load('https://threejs.org/examples/textures/earth_atmos_2048.jpg'); // Example texture
+        const sphereMaterial = new THREE.MeshStandardMaterial({ map: sphereTexture }); // Use standard material for lighting effects
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         scene.add(sphere);
 
-        // Add a directional light to illuminate the sphere
-        const light = new THREE.DirectionalLight(0xffffff, 1); // White light with intensity 1
-        light.position.set(5, 5, 5); // Position the light in the scene
+        // Add stars background
+        const starGeometry = new THREE.SphereGeometry(100, 64, 64);
+        const starMaterial = new THREE.MeshBasicMaterial({
+            map: textureLoader.load('https://threejs.org/examples/textures/galaxy_starfield.jpg'),
+            side: THREE.BackSide
+        });
+        const starField = new THREE.Mesh(starGeometry, starMaterial);
+        scene.add(starField);
+
+        // Lighting setup
+        const light = new THREE.DirectionalLight(0xffffff, 1); // White light with intensity of 1
+        light.position.set(5, 5, 5); // Light position
         scene.add(light);
 
-        // Ambient light for soft illumination
+        // Add ambient light to soften shadows
         const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
         scene.add(ambientLight);
 
@@ -62,15 +75,15 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Optional: Rotate the sphere for a nice effect
+            // Rotate the sphere for animation
             sphere.rotation.x += 0.01;
             sphere.rotation.y += 0.01;
 
-            // Render the scene from the perspective of the camera
+            // Render the scene
             renderer.render(scene, camera);
         }
 
-        animate(); // Start the animation loop
+        animate(); // Start animation
 
         // Handle window resizing
         window.addEventListener('resize', () => {
