@@ -67,45 +67,80 @@
         spotlight.target = sphere; // Make the spotlight target the sphere
         scene.add(spotlight);
 
-        // Position the camera
-        camera.position.z = 4;  // Adjusted camera position to ensure sphere is visible
-        camera.position.y = 0;
-        camera.position.x = 0;
+        // Initial camera position
+        const initialCameraPosition = new THREE.Vector3(0, 0, 4);
+        const initialCameraRotation = new THREE.Euler(0, 0, 0);
 
-        // Movement speed
-        const moveSpeed = 0.1;
+        camera.position.copy(initialCameraPosition);
+        camera.rotation.copy(initialCameraRotation);
+
+        // Movement speed and rotation speed
+        const moveSpeed = 0.05;
+        const rotationSpeed = 0.02;
+
+        // Smooth movement deltas
+        const velocity = new THREE.Vector3(0, 0, 0); // For smooth movement
+        const rotationVelocity = 0;  // For smooth rotation
 
         // Function to handle camera movement
         function handleKeyboard(event) {
-            switch(event.key) {
+            switch (event.key) {
                 case 'w':
-                    camera.position.z -= moveSpeed; // Move camera forward
+                    velocity.z = -moveSpeed; // Move camera forward
                     break;
                 case 's':
-                    camera.position.z += moveSpeed; // Move camera backward
+                    velocity.z = moveSpeed; // Move camera backward
                     break;
                 case 'a':
-                    camera.position.x -= moveSpeed; // Move camera left
+                    velocity.x = -moveSpeed; // Move camera left
                     break;
                 case 'd':
-                    camera.position.x += moveSpeed; // Move camera right
+                    velocity.x = moveSpeed; // Move camera right
                     break;
                 case ' ':
-                    camera.position.y += moveSpeed; // Move camera up (space bar)
+                    velocity.y = moveSpeed; // Move camera up (space bar)
                     break;
                 case 'Shift':
-                    camera.position.y -= moveSpeed; // Move camera down (shift)
+                    velocity.y = -moveSpeed; // Move camera down (shift)
+                    break;
+                case 'q':
+                    rotationVelocity = rotationSpeed; // Rotate camera left
+                    break;
+                case 'e':
+                    rotationVelocity = -rotationSpeed; // Rotate camera right
+                    break;
+                case 'r':
+                    // Reset camera position and rotation to initial state
+                    camera.position.copy(initialCameraPosition);
+                    camera.rotation.copy(initialCameraRotation);
+                    velocity.set(0, 0, 0); // Reset movement velocity
+                    rotationVelocity = 0;  // Reset rotation velocity
                     break;
             }
         }
 
-        // Add event listener for keyboard input
+        // Event listener for keyboard input
         window.addEventListener('keydown', handleKeyboard);
+        window.addEventListener('keyup', (event) => {
+            // Reset velocity when key is released
+            if (['w', 's', 'a', 'd', ' ', 'Shift'].includes(event.key)) {
+                velocity.set(0, 0, 0);
+            }
+            if (['q', 'e'].includes(event.key)) {
+                rotationVelocity = 0; // Stop rotating when key is released
+            }
+        });
 
         // Animation loop to rotate the sphere and animate the stars
         function animate() {
             requestAnimationFrame(animate);
-            
+
+            // Apply smooth movement
+            camera.position.add(velocity); // Update position smoothly
+
+            // Apply smooth rotation
+            camera.rotation.y += rotationVelocity; // Rotate camera around Y-axis
+
             // Rotate the sphere around the Y-axis (left and right)
             sphere.rotation.y += 0.001; // Adjust this value to change the speed
 
