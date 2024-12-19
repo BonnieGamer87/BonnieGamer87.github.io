@@ -1,68 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Half Yellow Half Green Sphere</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background-color: white;
-      overflow: hidden;
-      margin: 0;
-    }
-
-    .sphere-container {
-      width: 300px;
-      height: 300px;
-      position: relative;
-      transform-style: preserve-3d;
-      animation: rotate 5s infinite linear;
-      perspective: 800px; /* Adds depth to the 3D effect */
-    }
-
-    .sphere {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, yellow 50%, green 50%);
-      border-radius: 50%;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-      transform: rotateX(0deg) rotateY(0deg);
-    }
-
-    /* 3D Rotation Animation */
-    @keyframes rotate {
-      0% {
-        transform: rotateX(0deg) rotateY(0deg);
-      }
-      25% {
-        transform: rotateX(90deg) rotateY(0deg);
-      }
-      50% {
-        transform: rotateX(180deg) rotateY(0deg);
-      }
-      75% {
-        transform: rotateX(270deg) rotateY(0deg);
-      }
-      100% {
-        transform: rotateX(360deg) rotateY(0deg);
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotating 3D Sphere with Galaxy Background</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
-  <div class="sphere-container">
-    <div class="sphere"></div>
-  </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set up the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Set galaxy background with a black-purple color gradient
+        scene.background = new THREE.Color(0x120f1e);  // Dark purple background
+
+        // Create stars using points
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 10000;
+        const starPositions = [];
+
+        // Generate random stars
+        for (let i = 0; i < starCount; i++) {
+            const x = (Math.random() - 0.5) * 2000;  // Random X position
+            const y = (Math.random() - 0.5) * 2000;  // Random Y position
+            const z = (Math.random() - 0.5) * 2000;  // Random Z position
+            starPositions.push(x, y, z);
+        }
+
+        // Create a points material for stars
+        const starMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,  // Star color (white)
+            size: Math.random() * 0.5 + 0.5,  // Random star size
+            opacity: Math.random() * 0.8 + 0.2,  // Random opacity
+            transparent: true
+        });
+
+        // Add stars to the scene
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        // Load the texture for the sphere
+        const textureLoader = new THREE.TextureLoader();
+        const sphereTexture = textureLoader.load('https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.shadedrelief.com%2Fnatural3%2Fpages%2Ftextures.html&psig=AOvVaw2vjgAZXjKHvCFJJVsEF1k9&ust=1734706275322000&source=images&cd=vfe&opi=89978449&ved=0CBEQjRxqFwoTCOjFhM6KtIoDFQAAAAAdAAAAABAE');  // Example texture (Earth image)
+        
+        // Create a sphere geometry and apply the texture
+        const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
+        const sphereMaterial = new THREE.MeshBasicMaterial({ map: sphereTexture });  // Use the texture here
+        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+        scene.add(sphere);
+
+        // Position the camera
+        camera.position.z = 2;
+
+        // Animation loop to rotate the sphere and animate the stars
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate the sphere around the Y-axis (left and right)
+            sphere.rotation.y += 0.001; // Adjust this value to change the speed
+
+            // Rotate the stars to create a moving background effect (optional)
+            stars.rotation.x += 0.00001; // Slow rotation for stars
+            stars.rotation.y += 0.00001;
+
+            // Render the scene
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Adjust the camera aspect ratio and renderer size on window resize
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
 </body>
 </html>
