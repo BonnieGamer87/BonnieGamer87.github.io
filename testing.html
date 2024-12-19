@@ -58,6 +58,14 @@
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         scene.add(sphere);
 
+        // Add a spotlight to the left (position it to the left of the sphere)
+        const spotlight = new THREE.SpotLight(0xFFA500); // Orange color
+        spotlight.position.set(-5, 0, 2); // Position to the left of the scene
+        spotlight.intensity = 1; // 100% brightness
+        spotlight.castShadow = true;
+        spotlight.target = sphere; // Make the spotlight target the sphere
+        scene.add(spotlight);
+
         // Position the camera
         camera.position.z = 2;
 
