@@ -16,36 +16,26 @@
 
     const loader = new THREE.TextureLoader();
 
-    // Set the background texture with a base color
+    // Set the background to sky.png
     loader.load('sky.png', function(texture) {
-        scene.background = texture; // Apply texture to background
-        texture.colorSpace = THREE.SRGBColorSpace; // Ensure correct color rendering
+        scene.background = texture;
     });
-
-    scene.fog = new THREE.Fog(0x87ceeb, 10, 50); // Fog for depth effect (sky blue base color)
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Add a textured platform with a base color
+    // Add a textured platform using grass.png
     const platformGeometry = new THREE.BoxGeometry(100, 3, 100);
     const grassTexture = loader.load('grass.png');
     grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
     grassTexture.repeat.set(10, 10); // Repeat grass across the surface
 
-    const platformMaterial = new THREE.MeshStandardMaterial({
-        map: grassTexture,
-        color: 0x00ff00 // Bright green base color
-    });
+    const platformMaterial = new THREE.MeshBasicMaterial({ map: grassTexture });
     const platform = new THREE.Mesh(platformGeometry, platformMaterial);
     scene.add(platform);
     platform.position.y = -1.5;
-
-    // Ambient light for better visibility
-    const ambientLight = new THREE.AmbientLight(0x404040, 1); // Soft white light
-    scene.add(ambientLight);
 
     // Camera holder and character (representing the player)
     const cameraHolder = new THREE.Object3D();
@@ -56,82 +46,53 @@
     const character = cameraHolder;
     const gravity = 0.02;
 
+    // Jump-related variables
+    let isJumping = false;
+    let jumpVelocity = 0.3; // Initial velocity for jumping
+
     // FPS Controls
     const movementSpeed = 0.45;
     let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let yaw = 0; // Angle for direction
 
     document.addEventListener('keydown', (event) => {
-        switch (event.code) {
-            case 'KeyW': moveForward = true; break;
-            case 'KeyS': moveBackward = true; break;
-            case 'KeyA': moveLeft = true; break;
-            case 'KeyD': moveRight = true; break;
-            case 'Space': 
+        switch (event.key) {
+            case 'w': moveForward = true; break;
+            case 's': moveBackward = true; break;
+            case 'a': moveLeft = true; break;
+            case 'd': moveRight = true; break;
+            case ' ': // Jump key
                 if (!isJumping) {
                     isJumping = true;
-                    jumpVelocity = jumpStrength;
+                    jumpVelocity = 0.3; // Reset jump velocity
                 }
                 break;
         }
     });
 
     document.addEventListener('keyup', (event) => {
-        switch (event.code) {
-            case 'KeyW': moveForward = false; break;
-            case 'KeyS': moveBackward = false; break;
-            case 'KeyA': moveLeft = false; break;
-            case 'KeyD': moveRight = false; break;
+        switch (event.key) {
+            case 'w': moveForward = false; break;
+            case 's': moveBackward = false; break;
+            case 'a': moveLeft = false; break;
+            case 'd': moveRight = false; break;
         }
     });
 
-    // Mouse look
-    let yaw = 0;
-    let pitch = 0;
-
-    document.addEventListener('mousemove', (event) => {
-        yaw -= event.movementX * 0.002;
-        pitch -= event.movementY * 0.002;
-        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
-        cameraHolder.rotation.y = yaw;
-        camera.rotation.x = pitch;
-    });
-
-    document.body.addEventListener('click', () => {
-        document.body.requestPointerLock();
-    });
-
-    let isJumping = false;
-    let jumpVelocity = 0;
-    const jumpStrength = 0.5;
-
-    // Main loop
     function animate() {
         requestAnimationFrame(animate);
 
+        // Handle jumping
         if (isJumping) {
             character.position.y += jumpVelocity;
-            jumpVelocity -= gravity;
+            jumpVelocity -= gravity; // Reduce velocity due to gravity
             if (character.position.y <= 0) {
                 character.position.y = 0;
-                isJumping = false;
+                isJumping = false; // End jump when character reaches ground
             }
         }
 
-        if (
-            character.position.x < -50 || character.position.x > 50 ||
-            character.position.z < -50 || character.position.z > 50
-        ) {
-            character.position.y -= 0.1;
-            camera.position.y -= 0.1;
-        } else if (character.position.y <= 0 && !isJumping) {
-            character.position.y = 0;
-        }
-
-        if (character.position.y < -20) {
-            character.position.set(0, 0, 5);
-            camera.position.set(0, 0, 5); // Optional since camera is attached
-        }
-
+        // Movement controls
         if (moveForward) {
             character.position.x -= Math.sin(yaw) * movementSpeed;
             character.position.z -= Math.cos(yaw) * movementSpeed;
@@ -149,6 +110,7 @@
             character.position.z -= Math.sin(yaw) * movementSpeed;
         }
 
+        // Render scene
         renderer.render(scene, camera);
     }
 
