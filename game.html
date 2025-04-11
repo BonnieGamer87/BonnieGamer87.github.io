@@ -16,26 +16,36 @@
 
     const loader = new THREE.TextureLoader();
 
-    // Set the background to sky.png
+    // Set the background texture with a base color
     loader.load('sky.png', function(texture) {
-        scene.background = texture;
+        scene.background = texture; // Apply texture to background
+        texture.colorSpace = THREE.SRGBColorSpace; // Ensure correct color rendering
     });
+
+    scene.fog = new THREE.Fog(0x87ceeb, 10, 50); // Fog for depth effect (sky blue base color)
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Add a textured platform using grass.png
+    // Add a textured platform with a base color
     const platformGeometry = new THREE.BoxGeometry(100, 3, 100);
     const grassTexture = loader.load('grass.png');
     grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
     grassTexture.repeat.set(10, 10); // Repeat grass across the surface
 
-    const platformMaterial = new THREE.MeshBasicMaterial({ map: grassTexture });
+    const platformMaterial = new THREE.MeshStandardMaterial({
+        map: grassTexture,
+        color: 0x00ff00 // Bright green base color
+    });
     const platform = new THREE.Mesh(platformGeometry, platformMaterial);
     scene.add(platform);
     platform.position.y = -1.5;
+
+    // Ambient light for better visibility
+    const ambientLight = new THREE.AmbientLight(0x404040, 1); // Soft white light
+    scene.add(ambientLight);
 
     // Camera holder and character (representing the player)
     const cameraHolder = new THREE.Object3D();
