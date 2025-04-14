@@ -23,26 +23,30 @@
   document.body.appendChild(renderer.domElement);
 
   // Earth geometry
-  const geometry = new THREE.SphereGeometry(2, 64, 64);
+  const geometry = new THREE.SphereGeometry(2, 32, 32); // Reduced subdivisions for performance
 
-  // Texture loader
+  // Texture loader with fallback
   const loader = new THREE.TextureLoader();
   const texture = loader.load(
     'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Earth_Eastern_Hemisphere.jpg/1024px-Earth_Eastern_Hemisphere.jpg',
-    () => renderer.render(scene, camera),
+    () => console.log("Texture loaded successfully."),
     undefined,
-    (err) => console.error("Texture load error:", err)
+    (err) => {
+      console.error("Texture load error:", err);
+      alert("Failed to load Earth texture. Displaying fallback...");
+    }
   );
 
   const material = new THREE.MeshPhongMaterial({ map: texture });
   const earth = new THREE.Mesh(geometry, material);
   scene.add(earth);
 
-  // Lighting
-  const ambientLight = new THREE.AmbientLight(0x333333);
+  // Lighting with initial position
+  const ambientLight = new THREE.AmbientLight(0x444444); // Slightly brighter ambient light
   scene.add(ambientLight);
 
   const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+  directionalLight.position.set(10, 0, 10); // Set initial position
   scene.add(directionalLight);
 
   camera.position.z = 5;
@@ -50,7 +54,7 @@
   // Animate
   function animate() {
     requestAnimationFrame(animate);
-    earth.rotation.y += 0.001;
+    earth.rotation.y += 0.005; // Slightly faster rotation
 
     const now = new Date();
     const hour = now.getHours();
