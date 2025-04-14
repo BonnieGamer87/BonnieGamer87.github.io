@@ -63,40 +63,8 @@
         spotlight.target = sphere;
         scene.add(spotlight);
 
-        // Camera movement variables
-        const moveSpeed = 0.05;
-        const rotationSpeed = 0.02;
-        const velocity = new THREE.Vector3();
-        let rotationAngle = 0;
-        const keys = {};
-
-        // Key event listeners
-        window.addEventListener('keydown', (event) => keys[event.key] = true);
-        window.addEventListener('keyup', (event) => keys[event.key] = false);
-
-        function updateMovement() {
-            // Direction based on camera orientation
-            const direction = new THREE.Vector3();
-            camera.getWorldDirection(direction);
-            velocity.set(0, 0, 0);
-
-            if (keys['w']) velocity.addScaledVector(direction, moveSpeed);
-            if (keys['s']) velocity.addScaledVector(direction, -moveSpeed);
-
-            if (keys['a']) rotationAngle += rotationSpeed;
-            if (keys['d']) rotationAngle -= rotationSpeed;
-
-            if (keys[' ']) velocity.y += moveSpeed;
-            if (keys['Shift']) velocity.y -= moveSpeed;
-
-            // Apply rotation and movement
-            camera.rotation.y = rotationAngle;
-            camera.position.add(velocity);
-        }
-
         function animate() {
             requestAnimationFrame(animate);
-            updateMovement();
 
             sphere.rotation.y += 0.001;
             stars.rotation.x += 0.00001;
