@@ -2,55 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>3D Earth Day/Night</title>
-  <style>body { margin: 0; overflow: hidden; }</style>
+  <title>3D Earth with Day/Night</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    canvas { display: block; }
+  </style>
 </head>
 <body>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
   <script>
-    // Scene setup
+    // Setup scene, camera, renderer
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Earth geometry
+    // Create Earth sphere
     const geometry = new THREE.SphereGeometry(2, 64, 64);
 
-    // Load textures
     const loader = new THREE.TextureLoader();
-    const earthDay = loader.load('https://raw.githubusercontent.com/creativetimofficial/public-assets/master/soft-ui-dashboard/assets/img/earth-day.jpg');
-    const earthNight = loader.load('https://raw.githubusercontent.com/creativetimofficial/public-assets/master/soft-ui-dashboard/assets/img/earth-night.jpg');
+    const texture = loader.load(
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Earth_Eastern_Hemisphere.jpg/1024px-Earth_Eastern_Hemisphere.jpg',
+      () => renderer.render(scene, camera), // Render once texture loads
+      undefined,
+      (err) => console.error("Texture failed to load:", err)
+    );
 
-    // Shader material for day/night blending (basic simulation)
-    const material = new THREE.MeshPhongMaterial({ map: earthDay });
+    const material = new THREE.MeshPhongMaterial({
+      map: texture
+    });
 
     const earth = new THREE.Mesh(geometry, material);
     scene.add(earth);
 
-    // Lighting to simulate sun
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    scene.add(light);
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x333333);
+    scene.add(ambientLight);
 
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    scene.add(directionalLight);
+
+    // Position camera
     camera.position.z = 5;
 
+    // Animation loop
     function animate() {
       requestAnimationFrame(animate);
 
-      // Rotate Earth slowly
+      // Rotate the earth slowly
       earth.rotation.y += 0.001;
 
-      // Position light based on time
+      // Time-based light position (fake sun angle)
       const now = new Date();
-      const hours = now.getUTCHours();
-      const angle = (hours / 24) * 2 * Math.PI;
-      light.position.set(Math.cos(angle) * 10, 0, Math.sin(angle) * 10);
+      const hour = now.getHours();
+      const angle = (hour / 24) * Math.PI * 2;
+      directionalLight.position.set(Math.cos(angle) * 10, 0, Math.sin(angle) * 10);
 
       renderer.render(scene, camera);
     }
 
     animate();
+
+    // Resize handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   </script>
 </body>
 </html>
