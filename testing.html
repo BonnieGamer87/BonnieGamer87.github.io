@@ -17,34 +17,30 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true; // Enable shadow maps
         document.body.appendChild(renderer.domElement);
 
         // Set galaxy background with a black-purple color gradient
-        scene.background = new THREE.Color(0x120f1e);  // Dark purple background
+        scene.background = new THREE.Color(0x120f1e);
 
-        // Create stars using points
+        // Create stars
         const starGeometry = new THREE.BufferGeometry();
         const starCount = 10000;
         const starPositions = [];
 
-        // Generate random stars
         for (let i = 0; i < starCount; i++) {
-            const x = (Math.random() - 0.5) * 2000;  // Random X position
-            const y = (Math.random() - 0.5) * 2000;  // Random Y position
-            const z = (Math.random() - 0.5) * 2000;  // Random Z position
+            const x = (Math.random() - 0.5) * 2000;
+            const y = (Math.random() - 0.5) * 2000;
+            const z = (Math.random() - 0.5) * 2000;
             starPositions.push(x, y, z);
         }
 
-        // Create a points material for stars
         const starMaterial = new THREE.PointsMaterial({
-            color: 0xffffff,  // Star color (white)
-            size: 1,  // Set a constant size for all stars
-            opacity: 0.7,  // Set a constant opacity for all stars
+            color: 0xffffff,
+            size: 1,
+            opacity: 0.7,
             transparent: true
         });
 
-        // Add stars to the scene
         starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
         const stars = new THREE.Points(starGeometry, starMaterial);
         scene.add(stars);
@@ -52,109 +48,65 @@
         // Load the texture for the sphere
         const textureLoader = new THREE.TextureLoader();
         const sphereTexture = textureLoader.load('test3.png');
-        
-        // Create a sphere geometry and apply the texture
+
+        // Create a sphere
         const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
         const sphereMaterial = new THREE.MeshBasicMaterial({ map: sphereTexture });
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         scene.add(sphere);
 
-        // Add a spotlight to the left (position it to the left of the sphere)
-        const spotlight = new THREE.SpotLight(0xFFA500); // Orange color
-        spotlight.position.set(-5, 0, 2); // Position to the left of the scene
-        spotlight.intensity = 1; // 100% brightness
+        // Spotlight
+        const spotlight = new THREE.SpotLight(0xFFA500);
+        spotlight.position.set(-5, 0, 2);
+        spotlight.intensity = 1;
         spotlight.castShadow = true;
-        spotlight.target = sphere; // Make the spotlight target the sphere
+        spotlight.target = sphere;
         scene.add(spotlight);
 
-        // Initial camera position
-        const initialCameraPosition = new THREE.Vector3(0, 0, 4);
-        const initialCameraRotation = new THREE.Euler(0, 0, 0);
-
-        camera.position.copy(initialCameraPosition);
-        camera.rotation.copy(initialCameraRotation);
-
-        // Movement speed and rotation speed
+        // Camera movement variables
         const moveSpeed = 0.05;
         const rotationSpeed = 0.02;
+        const velocity = new THREE.Vector3();
+        let rotationAngle = 0;
+        const keys = {};
 
-        // Smooth movement deltas
-        const velocity = new THREE.Vector3(0, 0, 0); // For smooth movement
-        let rotationVelocity = 0;  // For smooth rotation
+        // Key event listeners
+        window.addEventListener('keydown', (event) => keys[event.key] = true);
+        window.addEventListener('keyup', (event) => keys[event.key] = false);
 
-        // Function to handle camera movement
-        function handleKeyboard(event) {
-            switch (event.key) {
-                case 'w':
-                    velocity.z = -moveSpeed; // Move camera forward
-                    break;
-                case 's':
-                    velocity.z = moveSpeed; // Move camera backward
-                    break;
-                case 'a':
-                    velocity.x = -moveSpeed; // Move camera left
-                    break;
-                case 'd':
-                    velocity.x = moveSpeed; // Move camera right
-                    break;
-                case ' ':
-                    velocity.y = moveSpeed; // Move camera up (space bar)
-                    break;
-                case 'Shift':
-                    velocity.y = -moveSpeed; // Move camera down (shift)
-                    break;
-                case 'q':
-                    rotationVelocity = rotationSpeed; // Rotate camera down around X-axis
-                    break;
-                case 'e':
-                    rotationVelocity = -rotationSpeed; // Rotate camera up around X-axis
-                    break;
-                case 'r':
-                    // Reset camera position and rotation to initial state
-                    camera.position.copy(initialCameraPosition);
-                    camera.rotation.copy(initialCameraRotation);
-                    velocity.set(0, 0, 0); // Reset movement velocity
-                    rotationVelocity = 0;  // Reset rotation velocity
-                    break;
-            }
+        function updateMovement() {
+            // Direction based on camera orientation
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+            velocity.set(0, 0, 0);
+
+            if (keys['w']) velocity.addScaledVector(direction, moveSpeed);
+            if (keys['s']) velocity.addScaledVector(direction, -moveSpeed);
+
+            if (keys['a']) rotationAngle += rotationSpeed;
+            if (keys['d']) rotationAngle -= rotationSpeed;
+
+            if (keys[' ']) velocity.y += moveSpeed;
+            if (keys['Shift']) velocity.y -= moveSpeed;
+
+            // Apply rotation and movement
+            camera.rotation.y = rotationAngle;
+            camera.position.add(velocity);
         }
 
-        // Event listener for keyboard input
-        window.addEventListener('keydown', handleKeyboard);
-        window.addEventListener('keyup', (event) => {
-            // Reset velocity when key is released
-            if (['w', 's', 'a', 'd', ' ', 'Shift'].includes(event.key)) {
-                velocity.set(0, 0, 0);
-            }
-            if (['q', 'e'].includes(event.key)) {
-                rotationVelocity = 0; // Stop rotating when key is released
-            }
-        });
-
-        // Animation loop to rotate the sphere and animate the stars
         function animate() {
             requestAnimationFrame(animate);
+            updateMovement();
 
-            // Apply smooth movement
-            camera.position.add(velocity); // Update position smoothly
-
-            // Apply smooth rotation (around X-axis)
-            camera.rotation.y += rotationVelocity; // Rotate camera around X-axis
-
-            // Rotate the sphere around the Y-axis (left and right)
-            sphere.rotation.y += 0.001; // Adjust this value to change the speed
-
-            // Rotate the stars to create a moving background effect (optional)
-            stars.rotation.x += 0.00001; // Slow rotation for stars
+            sphere.rotation.y += 0.001;
+            stars.rotation.x += 0.00001;
             stars.rotation.y += 0.00001;
 
-            // Render the scene
             renderer.render(scene, camera);
         }
 
         animate();
 
-        // Adjust the camera aspect ratio and renderer size on window resize
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);
             camera.aspect = window.innerWidth / window.innerHeight;
