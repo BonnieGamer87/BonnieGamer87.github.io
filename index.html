@@ -1,79 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>3D Earth Day/Night</title>
-  <style>
-    body { margin: 0; overflow: hidden; background: black; }
-    canvas { display: block; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Military Time and CDT/CST Clock</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .clock-container {
+            margin: 10px 0;
+        }
+        .clock {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+    </style>
+    <script>
+        function formatTo12Hour(time) {
+            let hours = time.getHours();
+            const minutes = time.getMinutes();
+            const seconds = time.getSeconds();
+            const amPm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12; // Convert to 12-hour format and handle midnight
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} ${amPm}`;
+        }
+
+        function updateClocks() {
+            const now = new Date();
+
+            // Military/Universal Time (UTC) - 24-hour format
+            const militaryTime = now.toISOString().substr(11, 8);
+            document.getElementById('military-clock').textContent = `Military Time (UTC): ${militaryTime}`;
+
+            // Central Daylight Time (CDT) - UTC-5
+            const cdtOffset = -5; // UTC-5 for CDT
+            const cdtTime = new Date(now.getTime() + cdtOffset * 3600 * 1000);
+            const cdtFormattedTime = formatTo12Hour(cdtTime);
+            document.getElementById('cdt-clock').textContent = `Daylight Saving Time (CDT - UTC-5): ${cdtFormattedTime}`;
+
+            // Central Standard Time (CST) - UTC-6
+            const cstOffset = -6; // UTC-6 for CST
+            const cstTime = new Date(now.getTime() + cstOffset * 3600 * 1000);
+            const cstFormattedTime = formatTo12Hour(cstTime);
+            document.getElementById('cst-clock').textContent = `Standard Time (CST - UTC-6): ${cstFormattedTime}`;
+        }
+
+        setInterval(updateClocks, 1000); // Update clocks every second
+    </script>
 </head>
 <body>
-
-<!-- Load Three.js first -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-
-
-<!-- Your custom script AFTER Three.js has loaded -->
-<script>
-  // Scene setup
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // Earth geometry
-  const geometry = new THREE.SphereGeometry(2, 32, 32); // Reduced subdivisions for performance
-
-  // Texture loader with fallback
-  const loader = new THREE.TextureLoader();
-  const texture = loader.load(
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Earth_Eastern_Hemisphere.jpg/1024px-Earth_Eastern_Hemisphere.jpg',
-    () => console.log("Texture loaded successfully."),
-    undefined,
-    (err) => {
-      console.error("Texture load error:", err);
-      alert("Failed to load Earth texture. Displaying fallback...");
-    }
-  );
-
-  const material = new THREE.MeshPhongMaterial({ map: texture });
-  const earth = new THREE.Mesh(geometry, material);
-  scene.add(earth);
-
-  // Lighting with initial position
-  const ambientLight = new THREE.AmbientLight(0x444444); // Slightly brighter ambient light
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(10, 0, 10); // Set initial position
-  scene.add(directionalLight);
-
-  camera.position.z = 5;
-
-  // Animate
-  function animate() {
-    requestAnimationFrame(animate);
-    earth.rotation.y += 0.005; // Slightly faster rotation
-
-    const now = new Date();
-    const hour = now.getHours();
-    const angle = (hour / 24) * Math.PI * 2;
-    directionalLight.position.set(Math.cos(angle) * 10, 0, Math.sin(angle) * 10);
-
-    renderer.render(scene, camera);
-  }
-
-  animate();
-
-  // Resize support
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-</script>
-
+    <h1>Military Time and CDT/CST Digital Clock</h1>
+    <div class="clock-container">
+        <div class="clock" id="military-clock"></div>
+    </div>
+    <div class="clock-container">
+        <div class="clock" id="cdt-clock"></div>
+    </div>
+    <div class="clock-container">
+        <div class="clock" id="cst-clock"></div>
+    </div>
 </body>
 </html>
