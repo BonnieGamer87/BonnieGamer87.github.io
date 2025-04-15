@@ -1,66 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Military Time and CDT/CST Clock</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-        .clock-container {
-            margin: 10px 0;
-        }
-        .clock {
-            font-size: 2rem;
-            font-weight: bold;
-        }
-    </style>
-    <script>
-        function formatTo12Hour(time) {
-            let hours = time.getHours();
-            const minutes = time.getMinutes();
-            const seconds = time.getSeconds();
-            const amPm = hours >= 12 ? 'PM' : 'AM';
-            hours = hours % 12 || 12; // Convert to 12-hour format and handle midnight
-            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} ${amPm}`;
-        }
-
-        function updateClocks() {
-            const now = new Date();
-
-            // Military/Universal Time (UTC) - 24-hour format
-            const militaryTime = now.toISOString().substr(11, 8);
-            document.getElementById('military-clock').textContent = `Military Time (UTC): ${militaryTime}`;
-
-            // Central Daylight Time (CDT) - UTC-5
-            const cdtOffset = -5; // UTC-5 for CDT
-            const cdtTime = new Date(now.getTime() + cdtOffset * 3600 * 1000);
-            const cdtFormattedTime = formatTo12Hour(cdtTime);
-            document.getElementById('cdt-clock').textContent = `Daylight Saving Time (CDT - UTC-5): ${cdtFormattedTime}`;
-
-            // Central Standard Time (CST) - UTC-6
-            const cstOffset = -6; // UTC-6 for CST
-            const cstTime = new Date(now.getTime() + cstOffset * 3600 * 1000);
-            const cstFormattedTime = formatTo12Hour(cstTime);
-            document.getElementById('cst-clock').textContent = `Standard Time (CST - UTC-6): ${cstFormattedTime}`;
-        }
-
-        setInterval(updateClocks, 1000); // Update clocks every second
-    </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smooth Solar System Clock</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 30px;
+      background-color: #000;
+      color: #fff;
+    }
+    select {
+      padding: 10px;
+      font-size: 1rem;
+      margin-bottom: 20px;
+    }
+    canvas {
+      background-color: #111;
+      display: block;
+      margin: 0 auto;
+      border-radius: 10px;
+    }
+    .clock {
+      font-size: 1.5rem;
+      margin-bottom: 10px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Military Time and CDT/CST Digital Clock</h1>
-    <div class="clock-container">
-        <div class="clock" id="military-clock"></div>
-    </div>
-    <div class="clock-container">
-        <div class="clock" id="cdt-clock"></div>
-    </div>
-    <div class="clock-container">
-        <div class="clock" id="cst-clock"></div>
-    </div>
+  <h1>Time Zone Solar System Clock</h1>
+  
+  <label for="timezone-select">Choose a time zone:</label><br><br>
+  <select id="timezone-select">
+    <option value="Local Time">Your Local Time</option>
+    <option value="UTC">Military Time (UTC)</option>
+    <option value="CST (UTC-6)">CST (UTC-6)</option>
+    <option value="CDT (UTC-5)">CDT (UTC-5)</option>
+  </select>
+
+  <div class="clock" id="main-clock"></div>
+  <canvas id="solarCanvas" width="400" height="400"></canvas>
+
+  <br>
+  <label for="view-select">View Mode:</label><br><br>
+  <select id="view-select">
+    <option value="default">Default Solar System</option>
+    <option value="earth-moon">Zoomed Earth & Moon</option>
+  </select>
+
+  <script>
+    let selectedTimeZone = 'Local Time';
+    let viewMode = 'default';
+
+    const canvas = document.getElementById('solarCanvas');
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const timeZoneMap = {
+      'Local Time': Intl.DateTimeFormat().resolvedOptions().timeZone,
+      'UTC': 'UTC',
+      'CST (UTC-6)': 'Etc/GMT+6',
+      'CDT (UTC-5)': 'Etc/GMT+5'
+    };
+
+    function getTimeInZone(tzName) {
+      const now = new Date();
+      const options = {
+        timeZone: timeZoneMap[tzName],
+        hour12: false,
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        fractionalSecondDigits: 3
+      };
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const parts = formatter.formatToParts(now);
+      const time = {};
+      parts.forEach(p => {
+        if (p.type === 'hour') time.hour = +p.value;
+        if (p.type === 'minute') time.minute = +p.value;
+        if (p.type === 'second') time.second = +p.value;
+        if (p.type === 'fractionalSecond') time.millis = +('0.' + p.value) * 1000;
+      });
+      return time;
+    }
+
+    function drawSolarSystem(time) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const totalSeconds =
+        time.hour * 3600 + time.minute * 60 + time.second + (time.millis || 0) / 1000;
+
+      const earthOrbitRadius = 120;
+      const moonOrbitRadius = 20;
+
+      const earthAngle = (totalSeconds / 86400) * 2 * Math.PI;
+      const moonAngle = (totalSeconds / 3600) * 2 * Math.PI;
+
+      const earthX = centerX + earthOrbitRadius * Math.cos(earthAngle);
+      const earthY = centerY + earthOrbitRadius * Math.sin(earthAngle);
+      const moonX = earthX + moonOrbitRadius * Math.cos(moonAngle);
+      const moonY = earthY + moonOrbitRadius * Math.sin(moonAngle);
+
+      if (viewMode === 'default') {
+        // Sun
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
+        ctx.fillStyle = 'yellow';
+        ctx.fill();
+
+        // Earth
+        ctx.beginPath();
+        ctx.arc(earthX, earthY, 12, 0, Math.PI * 2);
+        ctx.fillStyle = 'blue';
+        ctx.fill();
+
+        // Moon
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'lightgray';
+        ctx.fill();
+      } else if (viewMode === 'earth-moon') {
+        // Zoomed Earth centered
+        const zoomCenterX = centerX;
+        const zoomCenterY = centerY;
+
+        ctx.beginPath();
+        ctx.arc(zoomCenterX, zoomCenterY, 60, 0, Math.PI * 2);
+        ctx.fillStyle = 'blue';
+        ctx.fill();
+
+        const zoomMoonX = zoomCenterX + 100 * Math.cos(moonAngle);
+        const zoomMoonY = zoomCenterY + 100 * Math.sin(moonAngle);
+
+        ctx.beginPath();
+        ctx.arc(zoomMoonX, zoomMoonY, 16, 0, Math.PI * 2);
+        ctx.fillStyle = 'lightgray';
+        ctx.fill();
+      }
+    }
+
+    function updateClockDisplay() {
+      const now = new Date();
+      const timeZone = timeZoneMap[selectedTimeZone];
+      const timeString = now.toLocaleTimeString('en-US', {
+        timeZone,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZoneName: 'short'
+      });
+      document.getElementById('main-clock').textContent = `${selectedTimeZone}: ${timeString}`;
+    }
+
+    function animate() {
+      const time = getTimeInZone(selectedTimeZone);
+      drawSolarSystem(time);
+      requestAnimationFrame(animate);
+    }
+
+    document.getElementById('timezone-select').addEventListener('change', (e) => {
+      selectedTimeZone = e.target.value;
+    });
+
+    document.getElementById('view-select').addEventListener('change', (e) => {
+      viewMode = e.target.value;
+    });
+
+    setInterval(updateClockDisplay, 1000);
+    animate();
+    updateClockDisplay();
+  </script>
 </body>
-</html>
+</html> 
