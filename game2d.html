@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Multi-Square Game with Doors</title>
+<style>
+body {
+display: flex;
+justify-content: center;
+align-items: center;
+}
+.grid {
+display: grid;
+grid-template-areas:
+"top"
+"left middle right"
+"bottom";
+gap: 10px;
+justify-content: center;
+align-items: center;
+}
+canvas {
+border: 1px solid black;
+}
+#topCanvas {
+grid-area: top;
+}
+#leftCanvas {
+grid-area: left;
+}
+#middleCanvas {
+grid-area: middle;
+}
+#rightCanvas {
+grid-area: right;
+}
+#bottomCanvas {
+grid-area: bottom;
+}
+</style>
+</head>
+<body>
+<div class="grid">
+<canvas id="topCanvas" width="500" height="500"></canvas>
+<canvas id="leftCanvas" width="500" height="500"></canvas>
+<canvas id="middleCanvas" width="500" height="500"></canvas>
+<canvas id="rightCanvas" width="500" height="500"></canvas>
+<canvas id="bottomCanvas" width="500" height="500"></canvas>
+</div>
+<script>
+const canvases = {
+topCanvas: document.getElementById("topCanvas"),
+leftCanvas: document.getElementById("leftCanvas"),
+middleCanvas: document.getElementById("middleCanvas"),
+rightCanvas: document.getElementById("rightCanvas"),
+bottomCanvas: document.getElementById("bottomCanvas")
+};
+const ctxs = Object.fromEntries(
+Object.entries(canvases).map(([key, canvas]) => [key, canvas.getContext("2d")])
+);
+
+const player = {
+x: 250,
+y: 250,
+width: 20,
+height: 20,
+color: "black",
+speed: 5,
+currentCanvas: "middleCanvas"
+};
+
+const doors = {
+middleCanvas: [
+{ x: 0, y: 200, width: 20, height: 100, color: "red", target: "leftCanvas", spawnX: 480, spawnY: 200 },
+{ x: 480, y: 200, width: 20, height: 100, color: "green", target: "rightCanvas", spawnX: 0, spawnY: 200 },
+{ x: 200, y: 0, width: 100, height: 20, color: "blue", target: "topCanvas", spawnX: 200, spawnY: 480 },
+{ x: 200, y: 480, width: 100, height: 20, color: "orange", target: "bottomCanvas", spawnX: 200, spawnY: 0 }
+]
+};
+
+const keys = {};
+document.addEventListener("keydown", (e) => {
+keys[e.key] = true;
+
+if (e.key === "E" || e.key === "e") {
+player.color = ["red", "green", "blue", "orange"][
+(["red", "green", "blue", "orange"].indexOf(player.color) + 1) % 4
+];
+}
+});
+document.addEventListener("keyup", (e) => {
+keys[e.key] = false;
+});
+
+function switchCanvas(target, spawnX, spawnY) {
+player.currentCanvas = target;
+player.x = spawnX;
+player.y = spawnY;
+}
+
+function update() {
+if (keys["w"]) player.y -= player.speed;
+if (keys["s"]) player.y += player.speed;
+if (keys["a"]) player.x -= player.speed;
+if (keys["d"]) player.x += player.speed;
+
+const canvasDoors = doors[player.currentCanvas] || [];
+for (const door of canvasDoors) {
+if (
+player.x < door.x + door.width &&
+player.x + player.width > door.x &&
+player.y < door.y + door.height &&
+player.y + player.height > door.y &&
+player.color === door.color
+) {
+switchCanvas(door.target, door.spawnX, door.spawnY);
+break;
+}
+}
+
+player.x = Math.max(0, Math.min(canvases[player.currentCanvas].width - player.width, player.x));
+player.y = Math.max(0, Math.min(canvases[player.currentCanvas].height - player.height, player.y));
+}
+
+function draw() {
+Object.values(ctxs).forEach((ctx) =>
+ctx.clearRect(0, 0, canvases[player.currentCanvas].width, canvases[player.currentCanvas].height)
+);
+
+const ctx = ctxs[player.currentCanvas];
+ctx.fillStyle = player.color;
+ctx.fillRect(player.x, player.y, player.width, player.height);
+
+doors[player.currentCanvas]?.forEach((door) => {
+ctx.fillStyle = door.color;
+ctx.fillRect(door.x, door.y, door.width, door.height);
+});
+}
+
+function gameLoop() {
+update();
+draw();
+requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
