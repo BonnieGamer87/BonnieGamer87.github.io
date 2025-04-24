@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<style>
+<link href="https://fonts.googleapis.com/css?family=Fira+Mono" rel="stylesheet" />
+body {
+  background-color: transparent;
+  margin:0;
+  overflow:hidden;
+  padding:0;
+}
+
+.screen {
+  animation:colorPulse 5s infinite ease-in-out;
+  font-family:'Fira Mono', monospace;
+  font-size:20px;
+  height:100vh;
+  overflow:hidden;
+  padding:10vmin;
+  width:100vw;
+}
+
+.screen:before {
+  animation:wave 10s infinite ease-in-out;
+  content:"";
+  height:20vh;
+  left:0;
+  opacity:.5;
+  position:absolute;
+  right:0;
+  z-index:1;
+}
+
+.screen:after {
+  background-size:4px 4px;
+  bottom:0;
+  content:"";
+  left:0;
+  pointer-events:none;
+  position:absolute;
+  right:0;
+  top:0;
+  z-index:2;
+}
+
+@keyframes wave {
+  0% {
+    box-shadow:0 -10vh 20vh #0c0;
+    top:-100vh;
+  }
+  48%, 52% {
+    box-shadow:0 -10vh 20vh #090;
+  }
+  50% {
+    box-shadow:0 -10vh 20vh #060;
+  }
+  100% {
+    box-shadow:0 -10vh 20vh #0c0;
+    top:200vh;
+  }
+}
+
+</style>
+<div class="screen">
+  <p></p>
+</div>
+</html>
+
