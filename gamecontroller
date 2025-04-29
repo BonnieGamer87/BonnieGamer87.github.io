@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FPS Camera with Gamepad Support</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+<script>
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const platformGeometry = new THREE.BoxGeometry(100, 3, 100);
+    const platformMaterial = new THREE.MeshBasicMaterial({ color: 0x008000 });
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.position.y = -1.5;
+    scene.add(platform);
+
+    const platformBounds = { xMin: -50, xMax: 50, zMin: -50, zMax: 50 };
+
+    const cameraHolder = new THREE.Object3D();
+    cameraHolder.add(camera);
+    scene.add(cameraHolder);
+
+    const startingPosition = { x: 0, y: 1.5, z: 0 };
+    cameraHolder.position.set(startingPosition.x, startingPosition.y, startingPosition.z);
+
+    let isFlying = false, isJumping = false, isFalling = false, jumpVelocity = 0, yaw = 0, pitch = 0;
+    const gravity = 0.015, speed = 0.1, flySpeed = 0.5;
+    const joystickThreshold = 0.20; // Movement only activates at 0.20 or beyond
+
+    document.addEventListener('mousemove', (event) => {
+        yaw -= event.movementX * 0.002;
+        pitch -= event.movementY * 0.002;
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        cameraHolder.rotation.y = yaw;
+        camera.rotation.x = pitch;
+    });
+
+    document.body.addEventListener('click', () => document.body.requestPointerLock());
+
+    window.addEventListener("gamepadconnected", (event) => {
+        console.log(`Gamepad connected: ${event.gamepad.id}`);
+    });
+
+    function processGamepadInput(gamepad) {
+        // Only move if axes reach ±0.20 or more
+        const moveForward = gamepad.axes[1] <= -joystickThreshold;
+        const moveBackward = gamepad.axes[1] >= joystickThreshold;
+        const moveLeft = gamepad.axes[0] <= -joystickThreshold;
+        const moveRight = gamepad.axes[0] >= joystickThreshold;
+
+        // Camera control only applies if axis reaches ±0.20 or beyond
+        const lookYaw = Math.abs(gamepad.axes[2]) >= joystickThreshold ? gamepad.axes[2] * 0.05 : 0;
+        const lookPitch = Math.abs(gamepad.axes[3]) >= joystickThreshold ? gamepad.axes[3] * 0.05 : 0;
+
+        yaw -= lookYaw;
+        pitch -= lookPitch;
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        cameraHolder.rotation.y = yaw;
+        camera.rotation.x = pitch;
+
+        if (moveForward) {
+            cameraHolder.position.x -= Math.sin(yaw) * speed;
+            cameraHolder.position.z -= Math.cos(yaw) * speed;
+            if (isFlying) cameraHolder.position.y += Math.sin(pitch) * flySpeed;
+        }
+        if (moveBackward) {
+            cameraHolder.position.x += Math.sin(yaw) * speed;
+            cameraHolder.position.z += Math.cos(yaw) * speed;
+            if (isFlying) cameraHolder.position.y -= Math.sin(pitch) * flySpeed;
+        }
+        if (moveLeft) {
+            cameraHolder.position.x -= Math.cos(yaw) * speed;
+            cameraHolder.position.z += Math.sin(yaw) * speed;
+        }
+        if (moveRight) {
+            cameraHolder.position.x += Math.cos(yaw) * speed;
+            cameraHolder.position.z -= Math.sin(yaw) * speed;
+        }
+
+        if (gamepad.buttons[0].pressed && !isJumping && !isFalling) { // A button (Jump)
+            isJumping = true;
+            jumpVelocity = 0.5;
+        }
+
+        if (gamepad.buttons[1].pressed) { // B button (Toggle flight)
+            isFlying = !isFlying;
+        }
+
+        if (isFlying) {
+            if (gamepad.buttons[6].pressed) cameraHolder.position.y -= flySpeed; // LT (down)
+            if (gamepad.buttons[7].pressed) cameraHolder.position.y += flySpeed; // RT (up)
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        let gamepads = navigator.getGamepads();
+        if (gamepads[0]) {
+            processGamepadInput(gamepads[0]);
+        }
+
+        if (!isFlying) {
+            if (isJumping || isFalling) {
+                cameraHolder.position.y += jumpVelocity;
+                jumpVelocity -= gravity;
+            }
+
+            if (
+                cameraHolder.position.x >= platformBounds.xMin &&
+                cameraHolder.position.x <= platformBounds.xMax &&
+                cameraHolder.position.z >= platformBounds.zMin &&
+                cameraHolder.position.z <= platformBounds.zMax &&
+                cameraHolder.position.y <= 1.5
+            ) {
+                cameraHolder.position.y = 1.5;
+                isFalling = false;
+                isJumping = false;
+            } else if (cameraHolder.position.y > 1.5) {
+                isFalling = true;
+            }
+        }
+
+        if (cameraHolder.position.y < -50) {
+            cameraHolder.position.set(startingPosition.x, startingPosition.y, startingPosition.z);
+            isFalling = false;
+            isJumping = false;
+            yaw = 0;
+            pitch = 0;
+            cameraHolder.rotation.set(0, 0, 0);
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+</script>
+</body>
+</html>
