@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gamepad Input Detector</title>
+<style>
+body {
+font-family: Arial, sans-serif;
+text-align: center;
+margin-top: 50px;
+}
+ul {
+list-style-type: none;
+padding: 0;
+}
+li {
+font-size: 20px;
+font-weight: bold;
+margin: 5px 0;
+}
+</style>
+</head>
+<body>
+<h1>Gamepad Input Detector</h1>
+<p>Press any button or move any axis on your controller.</p>
+<ul id="output">
+<li>Waiting for input...</li>
+</ul>
+
+<script>
+const output = document.getElementById("output");
+
+// Define button mappings (example for Xbox controllers)
+const buttonNames = {
+0: "A",
+1: "B",
+2: "X",
+3: "Y",
+4: "Left Bumper",
+5: "Right Bumper",
+6: "Left Trigger",
+7: "Right Trigger",
+8: "Back",
+9: "Start",
+10: "Left Stick",
+11: "Right Stick",
+12: "D-Pad Up",
+13: "D-Pad Down",
+14: "D-Pad Left",
+15: "D-Pad Right",
+16: "Xbox"
+};
+
+function updateOutput(text) {
+output.innerHTML = "";
+text.forEach(item => {
+let li = document.createElement("li");
+li.textContent = item;
+output.appendChild(li);
+});
+}
+
+window.addEventListener("gamepadconnected", (event) => {
+updateOutput([`Gamepad connected: ${event.gamepad.id}`]);
+updateGamepadInputs();
+});
+
+function updateGamepadInputs() {
+let gamepads = navigator.getGamepads();
+for (let gamepad of gamepads) {
+if (gamepad) {
+let inputText = [`Gamepad: ${gamepad.id}`];
+
+gamepad.buttons.forEach((button, index) => {
+if (button.pressed) {
+let buttonName = buttonNames[index] || `Button ${index}`;
+inputText.push(`${buttonName} pressed`);
+}
+});
+
+gamepad.axes.forEach((axis, index) => {
+inputText.push(`Axis ${index}: ${axis.toFixed(2)}`);
+});
+
+updateOutput(inputText);
+}
+}
+
+requestAnimationFrame(updateGamepadInputs);
+}
+</script>
+</body>
+</html>
