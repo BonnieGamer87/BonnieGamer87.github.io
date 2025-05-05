@@ -33,7 +33,9 @@
             velocityY: 0,
             colors: ["purple", "brown", "blue", "yellow", "maroon", "#c58e29"],
             colorIndex: 0,
-            timer: null
+            timer: null,
+            timerStart: null,
+            countdown: 5 // Start the countdown at 5 seconds
         };
 
         const keys = {};
@@ -42,12 +44,34 @@
             player.colorIndex = 0; // Force player back to purple
             clearTimeout(player.timer);
             player.timer = null;
+            player.countdown = 5; // Reset countdown
         }
 
         function startColorTimer() {
-            if (player.colorIndex !== 0) { // Only set a timer for non-purple colors
-                clearTimeout(player.timer); // Reset any existing timer
-                player.timer = setTimeout(resetToPurple, 5000); // Force back to purple in 30 secs
+            if (player.colorIndex !== 0 && !player.timer) { // Only start a timer when the color is not purple and no timer is active
+                player.timerStart = Date.now();
+                player.timer = setInterval(updateTimer, 1000); // Start updating timer every second
+            } else if (player.colorIndex === 0) {
+                // If the player returns to purple, hide the timer
+                clearTimeout(player.timer);
+                player.timer = null;
+                player.countdown = 5; // Reset countdown
+            }
+        }
+
+        function updateTimer() {
+            if (player.colorIndex === 0) {
+                clearTimeout(player.timer);
+                player.timer = null;
+                player.countdown = 5; // Reset countdown when purple
+                return;
+            }
+
+            const elapsedTime = Math.floor((Date.now() - player.timerStart) / 1000);
+            player.countdown = 5 - elapsedTime; // Countdown from 5 seconds
+
+            if (player.countdown <= 0) {
+                resetToPurple(); // Reset to purple after 5 seconds
             }
         }
 
@@ -133,6 +157,15 @@
             // Character is drawn last so it appears on top
             ctx.fillStyle = player.colors[player.colorIndex];
             ctx.fillRect(player.x, player.y, player.size, player.size);
+
+            // Draw the countdown in the center of the cube
+            if (player.colorIndex !== 0 && player.countdown > 0) {
+                ctx.fillStyle = "white";
+                ctx.font = "24px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(player.countdown, player.x + player.size / 2, player.y + player.size / 2); // Draw countdown
+            }
 
             requestAnimationFrame(update);
         }
