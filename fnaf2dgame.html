@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Game - Camera Follow</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #202020;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        canvas.width = 5000;
+        canvas.height = 5000;
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 50,
+            baseSpeed: 5,
+            velocityX: 0,
+            velocityY: 0,
+            colors: ["purple", "brown", "blue", "yellow", "maroon", "#c58e29"],
+            colorIndex: 0,
+            timer: null
+        };
+
+        const keys = {};
+
+        function resetToPurple() {
+            player.colorIndex = 0; // Force player back to purple
+            clearTimeout(player.timer);
+            player.timer = null;
+        }
+
+        function startColorTimer() {
+            if (player.colorIndex !== 0) { // Only set a timer for non-purple colors
+                clearTimeout(player.timer); // Reset any existing timer
+                player.timer = setTimeout(resetToPurple, 5000); // Force back to purple in 30 secs
+            }
+        }
+
+        window.addEventListener("keydown", (event) => {
+            keys[event.key] = true;
+
+            if (event.key === "q") {
+                player.colorIndex = (player.colorIndex - 1 + player.colors.length) % player.colors.length;
+                startColorTimer();
+            }
+            if (event.key === "e") {
+                player.colorIndex = (player.colorIndex + 1) % player.colors.length;
+                startColorTimer();
+            }
+        });
+
+        window.addEventListener("keyup", (event) => {
+            keys[event.key] = false;
+        });
+
+        function drawCheckerboard() {
+            const tileSize = 50;
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                for (let y = 0; y < canvas.height; y += tileSize) {
+                    ctx.fillStyle = (x / tileSize + y / tileSize) % 2 === 0 ? "white" : "black";
+                    ctx.fillRect(x, y, tileSize, tileSize);
+                }
+            }
+        }
+
+        function update() {
+            player.velocityX = 0;
+            player.velocityY = 0;
+
+            if (keys["w"]) player.velocityY -= player.baseSpeed;
+            if (keys["s"]) player.velocityY += player.baseSpeed;
+            if (keys["a"]) player.velocityX -= player.baseSpeed;
+            if (keys["d"]) player.velocityX += player.baseSpeed;
+
+            if (player.velocityX !== 0 && player.velocityY !== 0) {
+                const normalizationFactor = Math.sqrt(2) / 2;
+                player.velocityX *= normalizationFactor;
+                player.velocityY *= normalizationFactor;
+            }
+
+            player.x += player.velocityX;
+            player.y += player.velocityY;
+
+            player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
+            player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
+
+            const cameraX = window.innerWidth / 2 - player.x;
+            const cameraY = window.innerHeight / 2 - player.y;
+
+            ctx.setTransform(1, 0, 0, 1, cameraX, cameraY);
+            ctx.clearRect(-cameraX, -cameraY, canvas.width, canvas.height);
+
+            drawCheckerboard();
+
+            // Dark overlay
+            ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+            ctx.fillRect(-cameraX, -cameraY, canvas.width, canvas.height);
+
+            // White flashlight glow with radial gradient for smooth fade
+            ctx.globalCompositeOperation = "lighter";
+            const gradient = ctx.createRadialGradient(
+                player.x + player.size / 2, 
+                player.y + player.size / 2, 
+                player.size * 1,  
+                player.x + player.size / 2, 
+                player.y + player.size / 2, 
+                player.size * 2.8  
+            );
+            gradient.addColorStop(0, "rgba(255, 255, 255, 0.5)");
+            gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(player.x + player.size / 2, player.y + player.size / 2, player.size * 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalCompositeOperation = "source-over";
+
+            // Character is drawn last so it appears on top
+            ctx.fillStyle = player.colors[player.colorIndex];
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+
+            requestAnimationFrame(update);
+        }
+
+        update();
+    </script>
+</body>
+</html>
