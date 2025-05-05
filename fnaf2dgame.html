@@ -106,10 +106,11 @@
             player.velocityX = 0;
             player.velocityY = 0;
 
-            if (keys["w"]) player.velocityY -= player.baseSpeed;
-            if (keys["s"]) player.velocityY += player.baseSpeed;
-            if (keys["a"]) player.velocityX -= player.baseSpeed;
-            if (keys["d"]) player.velocityX += player.baseSpeed;
+            // WASD Controls
+            if (keys["w"] || keys["ArrowUp"]) player.velocityY -= player.baseSpeed;
+            if (keys["s"] || keys["ArrowDown"]) player.velocityY += player.baseSpeed;
+            if (keys["a"] || keys["ArrowLeft"]) player.velocityX -= player.baseSpeed;
+            if (keys["d"] || keys["ArrowRight"]) player.velocityX += player.baseSpeed;
 
             if (player.velocityX !== 0 && player.velocityY !== 0) {
                 const normalizationFactor = Math.sqrt(2) / 2;
