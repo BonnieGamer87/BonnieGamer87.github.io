@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>2D Game - Camera Follow</title>
     <style>
         body {
@@ -30,6 +30,20 @@
             border-radius: 0px;
             transition: width 0.1s ease;
         }
+        #debugPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 14px;
+            border: 1px solid #0f0;
+            border-radius: 4px;
+            pointer-events: none;
+            white-space: pre-line;
+        }
     </style>
 </head>
 <body>
@@ -37,6 +51,8 @@
     <div id="sprintBar">
         <div id="sprintFill"></div>
     </div>
+    <div id="debugPanel"></div>
+
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -55,32 +71,33 @@
             colorIndex: 0,
             timer: null,
             timerStart: null,
-            countdown: 10, // Start the countdown at 5 seconds
-            sprinting: false, // Flag to check if sprinting
-            sprintBar: 1, // Sprint bar starts full (1 means full)
-            sprintCooldownSpeed: 0.002, // Slower sprint bar regeneration speed
-            sprintDrainSpeed: 0.005, // Slower drain speed for sprint bar
-            sprintThreshold: 0.6 // New threshold for when sprinting can occur again
+            countdown: 10,
+            sprinting: false,
+            sprintBar: 1,
+            sprintCooldownSpeed: 0.002,
+            sprintDrainSpeed: 0.005,
+            sprintThreshold: 0.8
         };
 
         const keys = {};
+        let lastTime = performance.now();
+        let fps = 0;
 
         function resetToPurple() {
-            player.colorIndex = 0; // Force player back to purple
+            player.colorIndex = 0;
             clearTimeout(player.timer);
             player.timer = null;
-            player.countdown = 5; // Reset countdown
+            player.countdown = 5;
         }
 
         function startColorTimer() {
-            if (player.colorIndex !== 0 && !player.timer) { // Only start a timer when the color is not purple and no timer is active
+            if (player.colorIndex !== 0 && !player.timer) {
                 player.timerStart = Date.now();
-                player.timer = setInterval(updateTimer, 1000); // Start updating timer every second
+                player.timer = setInterval(updateTimer, 1000);
             } else if (player.colorIndex === 0) {
-                // If the player returns to purple, hide the timer
                 clearTimeout(player.timer);
                 player.timer = null;
-                player.countdown = 5; // Reset countdown
+                player.countdown = 10;
             }
         }
 
@@ -88,22 +105,21 @@
             if (player.colorIndex === 0) {
                 clearTimeout(player.timer);
                 player.timer = null;
-                player.countdown = 5; // Reset countdown when purple
+                player.countdown = 5;
                 return;
             }
 
             const elapsedTime = Math.floor((Date.now() - player.timerStart) / 1000);
-            player.countdown = 5 - elapsedTime; // Countdown from 5 seconds
+            player.countdown = 10 - elapsedTime;
 
             if (player.countdown <= 0) {
-                resetToPurple(); // Reset to purple after 5 seconds
+                resetToPurple();
             }
         }
 
         window.addEventListener("keydown", (event) => {
             keys[event.key] = true;
 
-            // Change colors with Q and E keys
             if (event.key === "q") {
                 player.colorIndex = (player.colorIndex - 1 + player.colors.length) % player.colors.length;
                 startColorTimer();
@@ -113,7 +129,6 @@
                 startColorTimer();
             }
 
-            // Check if spacebar is pressed for sprinting (only if sprint bar is above the threshold)
             if (event.key === " " && player.sprintBar >= player.sprintThreshold) {
                 player.sprinting = true;
             }
@@ -122,7 +137,6 @@
         window.addEventListener("keyup", (event) => {
             keys[event.key] = false;
 
-            // Stop sprinting when spacebar is released
             if (event.key === " ") {
                 player.sprinting = false;
             }
@@ -142,43 +156,35 @@
             player.velocityX = 0;
             player.velocityY = 0;
 
-            // If sprinting, decrease the sprint bar more slowly
             if (player.sprinting) {
-                player.sprintBar -= player.sprintDrainSpeed; // Slower decrease of the sprint bar
+                player.sprintBar -= player.sprintDrainSpeed;
                 if (player.sprintBar <= 0) {
-                    player.sprinting = false; // Stop sprinting when the bar runs out
+                    player.sprinting = false;
                 }
             } else {
-                // Regenerate the sprint bar slowly when not sprinting
                 player.sprintBar += player.sprintCooldownSpeed;
-                if (player.sprintBar > 1) player.sprintBar = 1; // Ensure the bar doesn't exceed 100%
+                if (player.sprintBar > 1) player.sprintBar = 1;
             }
 
-            // Update speed based on sprinting status
             const speed = player.sprinting ? player.baseSpeed * 2 : player.baseSpeed;
 
-            // WASD and Arrow Key Controls (allow for all directions including diagonals)
             if (keys["w"] || keys["ArrowUp"]) player.velocityY -= speed;
             if (keys["s"] || keys["ArrowDown"]) player.velocityY += speed;
             if (keys["a"] || keys["ArrowLeft"]) player.velocityX -= speed;
             if (keys["d"] || keys["ArrowRight"]) player.velocityX += speed;
 
-            // Normalize diagonal movement to ensure consistent speed in all directions
             const diagonalLength = Math.sqrt(player.velocityX * player.velocityX + player.velocityY * player.velocityY);
             if (diagonalLength > speed) {
                 player.velocityX = (player.velocityX / diagonalLength) * speed;
                 player.velocityY = (player.velocityY / diagonalLength) * speed;
             }
 
-            // Update the player's position
             player.x += player.velocityX;
             player.y += player.velocityY;
 
-            // Keep the player within canvas bounds
             player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
             player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
 
-            // Set camera position
             const cameraX = window.innerWidth / 2 - player.x;
             const cameraY = window.innerHeight / 2 - player.y;
 
@@ -187,19 +193,17 @@
 
             drawCheckerboard();
 
-            // Dark overlay
             ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
             ctx.fillRect(-cameraX, -cameraY, canvas.width, canvas.height);
 
-            // White flashlight glow with radial gradient for smooth fade
             ctx.globalCompositeOperation = "lighter";
             const gradient = ctx.createRadialGradient(
-                player.x + player.size / 2, 
-                player.y + player.size / 2, 
-                player.size * 1,  
-                player.x + player.size / 2, 
-                player.y + player.size / 2, 
-                player.size * 2.8  
+                player.x + player.size / 2,
+                player.y + player.size / 2,
+                player.size * 1,
+                player.x + player.size / 2,
+                player.y + player.size / 2,
+                player.size * 2.8
             );
             gradient.addColorStop(0, "rgba(255, 255, 255, 0.5)");
             gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
@@ -210,22 +214,31 @@
             ctx.fill();
             ctx.globalCompositeOperation = "source-over";
 
-            // Character is drawn last so it appears on top
             ctx.fillStyle = player.colors[player.colorIndex];
             ctx.fillRect(player.x, player.y, player.size, player.size);
 
-            // Draw the countdown in the center of the cube
             if (player.colorIndex !== 0 && player.countdown > 0) {
                 ctx.fillStyle = "white";
                 ctx.font = "24px Arial";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(player.countdown, player.x + player.size / 2, player.y + player.size / 2); // Draw countdown
+                ctx.fillText(player.countdown, player.x + player.size / 2, player.y + player.size / 2);
             }
 
-            // Update sprint bar
             const sprintFill = document.getElementById('sprintFill');
             sprintFill.style.width = `${Math.max(0, player.sprintBar * 100)}%`;
+
+            // === FPS and Controls Debug Panel ===
+            const now = performance.now();
+            fps = Math.round(1000 / (now - lastTime));
+            lastTime = now;
+
+            let debugText = `FPS: ${fps}\nControls:\n`;
+            ["w", "a", "s", "d", "q", "e", " "].forEach(key => {
+                debugText += `${key.toUpperCase()}: ${keys[key] ? "Pressed" : "Up"}\n`;
+            });
+
+            document.getElementById("debugPanel").textContent = debugText.trim();
 
             requestAnimationFrame(update);
         }
