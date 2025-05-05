@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FNAF Game</title>
+    <title>2D Game - Camera Follow</title>
     <style>
         body {
             margin: 0;
@@ -55,11 +55,12 @@
             colorIndex: 0,
             timer: null,
             timerStart: null,
-            countdown: 5, // Start the countdown at 5 seconds
+            countdown: 10, // Start the countdown at 5 seconds
             sprinting: false, // Flag to check if sprinting
             sprintBar: 1, // Sprint bar starts full (1 means full)
             sprintCooldownSpeed: 0.002, // Slower sprint bar regeneration speed
-            sprintDrainSpeed: 0.005 // Slower drain speed for sprint bar (you can adjust this value)
+            sprintDrainSpeed: 0.005, // Slower drain speed for sprint bar
+            sprintThreshold: 0.6 // New threshold for when sprinting can occur again
         };
 
         const keys = {};
@@ -112,8 +113,8 @@
                 startColorTimer();
             }
 
-            // Check if spacebar is pressed for sprinting (only if sprint bar is full)
-            if (event.key === " " && player.sprintBar === 1) {
+            // Check if spacebar is pressed for sprinting (only if sprint bar is above the threshold)
+            if (event.key === " " && player.sprintBar >= player.sprintThreshold) {
                 player.sprinting = true;
             }
         });
