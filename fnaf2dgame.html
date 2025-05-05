@@ -13,10 +13,30 @@
         canvas {
             display: block;
         }
+        #sprintBar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 20px;
+            background-color: #444;
+            border-radius: 0px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        #sprintFill {
+            height: 100%;
+            background-color: #00ff00;
+            border-radius: 0px;
+            transition: width 0.1s ease;
+        }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="sprintBar">
+        <div id="sprintFill"></div>
+    </div>
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -35,7 +55,11 @@
             colorIndex: 0,
             timer: null,
             timerStart: null,
-            countdown: 5 // Start the countdown at 5 seconds
+            countdown: 5, // Start the countdown at 5 seconds
+            sprinting: false, // Flag to check if sprinting
+            sprintBar: 1, // Sprint bar starts full (1 means full)
+            sprintCooldownSpeed: 0.002, // Slower sprint bar regeneration speed
+            sprintDrainSpeed: 0.005 // Slower drain speed for sprint bar (you can adjust this value)
         };
 
         const keys = {};
@@ -78,6 +102,7 @@
         window.addEventListener("keydown", (event) => {
             keys[event.key] = true;
 
+            // Change colors with Q and E keys
             if (event.key === "q") {
                 player.colorIndex = (player.colorIndex - 1 + player.colors.length) % player.colors.length;
                 startColorTimer();
@@ -86,10 +111,20 @@
                 player.colorIndex = (player.colorIndex + 1) % player.colors.length;
                 startColorTimer();
             }
+
+            // Check if spacebar is pressed for sprinting (only if sprint bar is full)
+            if (event.key === " " && player.sprintBar === 1) {
+                player.sprinting = true;
+            }
         });
 
         window.addEventListener("keyup", (event) => {
             keys[event.key] = false;
+
+            // Stop sprinting when spacebar is released
+            if (event.key === " ") {
+                player.sprinting = false;
+            }
         });
 
         function drawCheckerboard() {
@@ -106,24 +141,43 @@
             player.velocityX = 0;
             player.velocityY = 0;
 
-            // WASD Controls
-            if (keys["w"] || keys["ArrowUp"]) player.velocityY -= player.baseSpeed;
-            if (keys["s"] || keys["ArrowDown"]) player.velocityY += player.baseSpeed;
-            if (keys["a"] || keys["ArrowLeft"]) player.velocityX -= player.baseSpeed;
-            if (keys["d"] || keys["ArrowRight"]) player.velocityX += player.baseSpeed;
-
-            if (player.velocityX !== 0 && player.velocityY !== 0) {
-                const normalizationFactor = Math.sqrt(2) / 2;
-                player.velocityX *= normalizationFactor;
-                player.velocityY *= normalizationFactor;
+            // If sprinting, decrease the sprint bar more slowly
+            if (player.sprinting) {
+                player.sprintBar -= player.sprintDrainSpeed; // Slower decrease of the sprint bar
+                if (player.sprintBar <= 0) {
+                    player.sprinting = false; // Stop sprinting when the bar runs out
+                }
+            } else {
+                // Regenerate the sprint bar slowly when not sprinting
+                player.sprintBar += player.sprintCooldownSpeed;
+                if (player.sprintBar > 1) player.sprintBar = 1; // Ensure the bar doesn't exceed 100%
             }
 
+            // Update speed based on sprinting status
+            const speed = player.sprinting ? player.baseSpeed * 2 : player.baseSpeed;
+
+            // WASD and Arrow Key Controls (allow for all directions including diagonals)
+            if (keys["w"] || keys["ArrowUp"]) player.velocityY -= speed;
+            if (keys["s"] || keys["ArrowDown"]) player.velocityY += speed;
+            if (keys["a"] || keys["ArrowLeft"]) player.velocityX -= speed;
+            if (keys["d"] || keys["ArrowRight"]) player.velocityX += speed;
+
+            // Normalize diagonal movement to ensure consistent speed in all directions
+            const diagonalLength = Math.sqrt(player.velocityX * player.velocityX + player.velocityY * player.velocityY);
+            if (diagonalLength > speed) {
+                player.velocityX = (player.velocityX / diagonalLength) * speed;
+                player.velocityY = (player.velocityY / diagonalLength) * speed;
+            }
+
+            // Update the player's position
             player.x += player.velocityX;
             player.y += player.velocityY;
 
+            // Keep the player within canvas bounds
             player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
             player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
 
+            // Set camera position
             const cameraX = window.innerWidth / 2 - player.x;
             const cameraY = window.innerHeight / 2 - player.y;
 
@@ -167,6 +221,10 @@
                 ctx.textBaseline = "middle";
                 ctx.fillText(player.countdown, player.x + player.size / 2, player.y + player.size / 2); // Draw countdown
             }
+
+            // Update sprint bar
+            const sprintFill = document.getElementById('sprintFill');
+            sprintFill.style.width = `${Math.max(0, player.sprintBar * 100)}%`;
 
             requestAnimationFrame(update);
         }
