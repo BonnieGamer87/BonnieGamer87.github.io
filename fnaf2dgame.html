@@ -30,20 +30,6 @@
             border-radius: 0px;
             transition: width 0.1s ease;
         }
-        #debugPanel {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            padding: 10px 15px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: #0f0;
-            font-family: monospace;
-            font-size: 14px;
-            border: 1px solid #0f0;
-            border-radius: 4px;
-            pointer-events: none;
-            white-space: pre-line;
-        }
     </style>
 </head>
 <body>
@@ -51,7 +37,6 @@
     <div id="sprintBar">
         <div id="sprintFill"></div>
     </div>
-    <div id="debugPanel"></div>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -87,7 +72,7 @@
             player.colorIndex = 0;
             clearTimeout(player.timer);
             player.timer = null;
-            player.countdown = 5;
+            player.countdown = 10;
         }
 
         function startColorTimer() {
@@ -105,7 +90,7 @@
             if (player.colorIndex === 0) {
                 clearTimeout(player.timer);
                 player.timer = null;
-                player.countdown = 5;
+                player.countdown = 10;
                 return;
             }
 
@@ -227,18 +212,6 @@
 
             const sprintFill = document.getElementById('sprintFill');
             sprintFill.style.width = `${Math.max(0, player.sprintBar * 100)}%`;
-
-            // === FPS and Controls Debug Panel ===
-            const now = performance.now();
-            fps = Math.round(1000 / (now - lastTime));
-            lastTime = now;
-
-            let debugText = `FPS: ${fps}\nControls:\n`;
-            ["w", "a", "s", "d", "q", "e", " "].forEach(key => {
-                debugText += `${key.toUpperCase()}: ${keys[key] ? "Pressed" : "Up"}\n`;
-            });
-
-            document.getElementById("debugPanel").textContent = debugText.trim();
 
             requestAnimationFrame(update);
         }
