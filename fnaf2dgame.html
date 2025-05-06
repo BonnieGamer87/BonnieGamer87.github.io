@@ -52,7 +52,7 @@
             baseSpeed: 5,
             velocityX: 0,
             velocityY: 0,
-            colors: ["purple", "brown", "blue", "yellow", "maroon", "#c58e29"],
+            colors: ["purple", "brown", "blue", "yellow", "red", "#c58e29"],
             colorIndex: 0,
             timer: null,
             timerStart: null,
@@ -61,22 +61,28 @@
             sprintBar: 1,
             sprintCooldownSpeed: 0.002,
             sprintDrainSpeed: 0.005,
-            sprintThreshold: 0.8
+            sprintThreshold: 0.85,
+            cooldownTime: 10,
+            cooldownActive: false,
+            cooldownStart: null
         };
 
         const keys = {};
         let lastTime = performance.now();
         let fps = 0;
 
+        // Timer functions
         function resetToPurple() {
             player.colorIndex = 0;
             clearTimeout(player.timer);
             player.timer = null;
             player.countdown = 10;
+            player.cooldownActive = true;
+            player.cooldownStart = Date.now();
         }
 
         function startColorTimer() {
-            if (player.colorIndex !== 0 && !player.timer) {
+            if (player.colorIndex !== 0 && !player.timer && !player.cooldownActive) {
                 player.timerStart = Date.now();
                 player.timer = setInterval(updateTimer, 1000);
             } else if (player.colorIndex === 0) {
@@ -102,16 +108,58 @@
             }
         }
 
+        function startCooldown() {
+            player.cooldownActive = true;
+            player.cooldownStart = Date.now();
+        }
+
+        function updateCooldown() {
+            if (player.cooldownActive) {
+                const elapsedCooldown = Math.floor((Date.now() - player.cooldownStart) / 1000);
+                const remainingCooldown = Math.max(0, player.cooldownTime - elapsedCooldown);
+
+                if (remainingCooldown > 0) {
+                    ctx.fillStyle = "red";
+                    ctx.font = "24px Arial";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(remainingCooldown, player.x + player.size / 2, player.y + player.size / 2);
+                } else {
+                    player.cooldownActive = false;
+                }
+            }
+        }
+
+        // Track previous color index to detect transition to purple
+        let previousColorIndex = player.colorIndex;
+
         window.addEventListener("keydown", (event) => {
             keys[event.key] = true;
 
-            if (event.key === "q") {
+            // Color switching logic with cooldown detection for switching TO purple
+            if (event.key === "q" && !player.cooldownActive) {
+                previousColorIndex = player.colorIndex;
                 player.colorIndex = (player.colorIndex - 1 + player.colors.length) % player.colors.length;
                 startColorTimer();
+
+                if (player.colorIndex === 0 && previousColorIndex !== 0) {
+                    startCooldown();
+                }
             }
-            if (event.key === "e") {
+
+            if (event.key === "e" && !player.cooldownActive) {
+                previousColorIndex = player.colorIndex;
                 player.colorIndex = (player.colorIndex + 1) % player.colors.length;
                 startColorTimer();
+
+                if (player.colorIndex === 0 && previousColorIndex !== 0) {
+                    startCooldown();
+                }
+            }
+
+            // Reset to purple (colorIndex = 0) with cooldown
+            if (event.key === "r" && !player.cooldownActive) {
+                resetToPurple();
             }
 
             if (event.key === " " && player.sprintBar >= player.sprintThreshold) {
@@ -209,6 +257,8 @@
                 ctx.textBaseline = "middle";
                 ctx.fillText(player.countdown, player.x + player.size / 2, player.y + player.size / 2);
             }
+
+            updateCooldown();
 
             const sprintFill = document.getElementById('sprintFill');
             sprintFill.style.width = `${Math.max(0, player.sprintBar * 100)}%`;
