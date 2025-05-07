@@ -72,7 +72,7 @@
             constructor(color, id) {
                 this.x = canvas.width / 2 + (Math.random() - 0.5) * 200; // Spawn near the middle
                 this.y = canvas.height / 2 + (Math.random() - 0.5) * 200; // Spawn near the middle
-                this.size = 50;
+                this.size = 55;
                 this.color = color;
                 this.velocityX = 0; // Start with no initial velocity
                 this.velocityY = 0;
@@ -109,7 +109,7 @@
 
                 // Display NPC ID in the center
                 ctx.fillStyle = "white";
-                ctx.font = "16px Arial";
+                ctx.font = "24px Arial";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.fillText(this.id, this.x + this.size / 2, this.y + this.size / 2);
@@ -136,6 +136,32 @@
                     this.x += ax;
                     this.y += ay;
                 }
+            }
+
+            checkCollisionWithOtherNPCs(npcs) {
+                // Check for collisions with other NPCs
+                npcs.forEach(npc => {
+                    if (npc !== this) { // Skip collision check with itself
+                        const dx = this.x - npc.x;
+                        const dy = this.y - npc.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const combinedHalfWidths = this.size / 2 + npc.size / 2;
+
+                        if (distance < combinedHalfWidths) {
+                            const angle = Math.atan2(dy, dx);
+                            const targetX = npc.x + Math.cos(angle) * (combinedHalfWidths + 1);
+                            const targetY = npc.y + Math.sin(angle) * (combinedHalfWidths + 1);
+
+                            // Move the NPC out of the collision area
+                            const ax = targetX - this.x;
+                            const ay = targetY - this.y;
+
+                            // Apply movement to avoid overlap
+                            this.x += ax;
+                            this.y += ay;
+                        }
+                    }
+                });
             }
         }
 
@@ -339,6 +365,7 @@
             npcs.forEach(npc => {
                 npc.move(); // Move NPC according to its velocity
                 npc.checkCollisionWithPlayer(player); // Check for collisions with the player
+                npc.checkCollisionWithOtherNPCs(npcs); // Check for collisions with other NPCs
                 npc.draw(); // Draw NPC
             });
 
