@@ -60,16 +60,134 @@
             sprinting: false,
             sprintBar: 1,
             sprintCooldownSpeed: 0.002,
-            sprintDrainSpeed: 0.005,
-            sprintThreshold: 0.85,
+            sprintDrainSpeed: 0,
+            sprintThreshold: 0,
             cooldownTime: 10,
             cooldownActive: false,
             cooldownStart: null
         };
 
+        // NPC class to define behavior of NPCs
+        class NPC {
+            constructor(color, id) {
+                this.x = canvas.width / 2 + (Math.random() - 0.5) * 200; // Spawn near the middle
+                this.y = canvas.height / 2 + (Math.random() - 0.5) * 200; // Spawn near the middle
+                this.size = 50;
+                this.color = color;
+                this.velocityX = 0; // Start with no initial velocity
+                this.velocityY = 0;
+                this.id = id; // Assign unique ID to each NPC
+                this.baseSpeed = 5; // Base speed for movement
+            }
+
+            move() {
+                // Randomize NPC direction for more natural movement
+                const randomFactor = 0.1; // Adjust to control randomness
+                this.velocityX += (Math.random() - 0.5) * randomFactor;
+                this.velocityY += (Math.random() - 0.5) * randomFactor;
+
+                // Normalize the velocity to ensure consistent speed
+                const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+                if (speed > this.baseSpeed) {
+                    const scale = this.baseSpeed / speed;
+                    this.velocityX *= scale;
+                    this.velocityY *= scale;
+                }
+
+                // Move NPC according to its velocity
+                this.x += this.velocityX;
+                this.y += this.velocityY;
+
+                // Prevent NPCs from going out of bounds (and bounce them off edges)
+                if (this.x < 0 || this.x > canvas.width) this.velocityX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.velocityY *= -1;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+
+                // Display NPC ID in the center
+                ctx.fillStyle = "white";
+                ctx.font = "16px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(this.id, this.x + this.size / 2, this.y + this.size / 2);
+            }
+
+            checkCollisionWithPlayer(player) {
+                // Check if this NPC is colliding with the player
+                const dx = this.x - player.x;
+                const dy = this.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const combinedHalfWidths = this.size / 2 + player.size / 2;
+
+                // If distance is less than the combined radius of both, then they are colliding
+                if (distance < combinedHalfWidths) {
+                    const angle = Math.atan2(dy, dx);
+                    const targetX = player.x + Math.cos(angle) * (combinedHalfWidths + 1);
+                    const targetY = player.y + Math.sin(angle) * (combinedHalfWidths + 1);
+
+                    // Move the NPC out of the collision area
+                    const ax = targetX - this.x;
+                    const ay = targetY - this.y;
+
+                    // Apply movement to avoid overlap
+                    this.x += ax;
+                    this.y += ay;
+                }
+            }
+        }
+
+        // Array to hold all NPCs
+        const npcs = [];
+        const npcColors = ["brown", "blue", "yellow", "red"];
+
+        // Spawn initial NPCs with unique IDs
+        npcColors.forEach((color, index) => {
+            npcs.push(new NPC(color, index + 1)); // Assign NPC ID 1, 2, 3, 4
+        });
+
+        // Track previous color index to detect transition to purple
+        let previousColorIndex = player.colorIndex;
+
+        // Event listeners for player controls
         const keys = {};
-        let lastTime = performance.now();
-        let fps = 0;
+        window.addEventListener("keydown", (event) => {
+            keys[event.key] = true;
+
+            if (event.key === "q" && !player.cooldownActive) {
+                previousColorIndex = player.colorIndex;
+                player.colorIndex = (player.colorIndex - 1 + player.colors.length) % player.colors.length;
+                startColorTimer();
+
+                if (player.colorIndex === 0 && previousColorIndex !== 0) {
+                    startCooldown();
+                }
+            }
+
+            if (event.key === "e" && !player.cooldownActive) {
+                previousColorIndex = player.colorIndex;
+                player.colorIndex = (player.colorIndex + 1) % player.colors.length;
+                startColorTimer();
+
+                if (player.colorIndex === 0 && previousColorIndex !== 0) {
+                    startCooldown();
+                }
+            }
+
+            if (event.key === " " && player.sprintBar >= player.sprintThreshold) {
+                player.sprinting = true;
+            }
+        });
+
+        window.addEventListener("keyup", (event) => {
+            keys[event.key] = false;
+
+            if (event.key === " ") {
+                player.sprinting = false;
+            }
+        });
 
         // Timer functions
         function resetToPurple() {
@@ -130,48 +248,7 @@
             }
         }
 
-        // Track previous color index to detect transition to purple
-        let previousColorIndex = player.colorIndex;
-
-        window.addEventListener("keydown", (event) => {
-            keys[event.key] = true;
-
-            // Color switching logic with cooldown detection for switching TO purple
-            if (event.key === "q" && !player.cooldownActive) {
-                previousColorIndex = player.colorIndex;
-                player.colorIndex = (player.colorIndex - 1 + player.colors.length) % player.colors.length;
-                startColorTimer();
-
-                if (player.colorIndex === 0 && previousColorIndex !== 0) {
-                    startCooldown();
-                }
-            }
-
-            if (event.key === "e" && !player.cooldownActive) {
-                previousColorIndex = player.colorIndex;
-                player.colorIndex = (player.colorIndex + 1) % player.colors.length;
-                startColorTimer();
-
-                if (player.colorIndex === 0 && previousColorIndex !== 0) {
-                    startCooldown();
-                }
-            }
-
-            // Removed "r" key functionality
-
-            if (event.key === " " && player.sprintBar >= player.sprintThreshold) {
-                player.sprinting = true;
-            }
-        });
-
-        window.addEventListener("keyup", (event) => {
-            keys[event.key] = false;
-
-            if (event.key === " ") {
-                player.sprinting = false;
-            }
-        });
-
+        // Draw checkerboard pattern
         function drawCheckerboard() {
             const tileSize = 50;
             for (let x = 0; x < canvas.width; x += tileSize) {
@@ -182,6 +259,7 @@
             }
         }
 
+        // Update function
         function update() {
             player.velocityX = 0;
             player.velocityY = 0;
@@ -256,6 +334,13 @@
             }
 
             updateCooldown();
+
+            // Update and draw all NPCs
+            npcs.forEach(npc => {
+                npc.move(); // Move NPC according to its velocity
+                npc.checkCollisionWithPlayer(player); // Check for collisions with the player
+                npc.draw(); // Draw NPC
+            });
 
             const sprintFill = document.getElementById('sprintFill');
             sprintFill.style.width = `${Math.max(0, player.sprintBar * 100)}%`;
