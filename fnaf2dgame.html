@@ -157,10 +157,7 @@
                 }
             }
 
-            // Reset to purple (colorIndex = 0) with cooldown
-            if (event.key === "r" && !player.cooldownActive) {
-                resetToPurple();
-            }
+            // Removed "r" key functionality
 
             if (event.key === " " && player.sprintBar >= player.sprintThreshold) {
                 player.sprinting = true;
