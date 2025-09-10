@@ -1,179 +1,198 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smooth Solar System Clock</title>
-  <style>
-    body { 
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 30px;
-      background-color: #000;
-      color: #fff;
-    }
-    select {
-      padding: 10px;
-      font-size: 1rem;
-      margin-bottom: 20px;
-    }
-    canvas {
-      background-color: #111;
-      display: block;
-      margin: 0 auto;
-      border-radius: 10px;
-    }
-    .clock {
-      font-size: 1.5rem;
-      margin-bottom: 10px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PS3 Home Screen Demo</title>
+<style>
+  body {
+    background: #000;
+    color: white;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    overflow: hidden;
+  }
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 40px;
+    box-sizing: border-box;
+  }
+  /* Main menu: horizontal list */
+  .main-menu {
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    margin-bottom: 30px;
+  }
+  .main-item {
+    text-align: center;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.3s, transform 0.3s;
+    user-select: none;
+  }
+  .main-item.selected {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  .main-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+  }
+  .main-label {
+    font-size: 18px;
+  }
+  /* Submenu: vertical list */
+  .sub-menu {
+    width: 300px;
+    margin: 0 auto;
+    background: #222;
+    border-radius: 8px;
+    padding: 10px 0;
+    box-shadow: 0 0 20px #00aaff;
+  }
+  .sub-item {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: background 0.3s, opacity 0.3s;
+    user-select: none;
+  }
+  .sub-item.selected {
+    background: #00aaff;
+    opacity: 1;
+  }
+</style>
 </head>
 <body>
-  <h1>Time Zone Solar System Clock</h1>
-  
-  <label for="timezone-select">Choose a time zone:</label><br><br>
-  <select id="timezone-select">
-    <option value="Local Time">Your Local Time</option>
-    <option value="UTC">Military Time (UTC)</option>
-    <option value="CST (UTC-6)">CST (UTC-6)</option>
-    <option value="CDT (UTC-5)">CDT (UTC-5)</option>
-  </select>
+  <div class="container">
+    <div class="main-menu" id="mainMenu">
+      <!-- main menu items will go here -->
+    </div>
+    <div class="sub-menu" id="subMenu">
+      <!-- submenu items here -->
+    </div>
+  </div>
 
-  <div class="clock" id="main-clock"></div>
-  <canvas id="solarCanvas" width="400" height="400"></canvas>
-
-  <br>
-  <label for="view-select">View Mode:</label><br><br>
-  <select id="view-select">
-    <option value="default">Default Solar System</option>
-    <option value="earth-moon">Zoomed Earth & Moon</option>
-  </select>
-
-  <script>
-    let selectedTimeZone = 'Local Time';
-    let viewMode = 'default';
-
-    const canvas = document.getElementById('solarCanvas');
-    const ctx = canvas.getContext('2d');
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-
-    const timeZoneMap = {
-      'Local Time': Intl.DateTimeFormat().resolvedOptions().timeZone,
-      'UTC': 'UTC',
-      'CST (UTC-6)': 'Etc/GMT+6',
-      'CDT (UTC-5)': 'Etc/GMT+5'
-    };
-
-    function getTimeInZone(tzName) {
-      const now = new Date();
-      const options = {
-        timeZone: timeZoneMap[tzName],
-        hour12: false,
-        hour: 'numeric',
-        minute: 'numeric',
-        second: 'numeric',
-        fractionalSecondDigits: 3
-      };
-      const formatter = new Intl.DateTimeFormat('en-US', options);
-      const parts = formatter.formatToParts(now);
-      const time = {};
-      parts.forEach(p => {
-        if (p.type === 'hour') time.hour = +p.value;
-        if (p.type === 'minute') time.minute = +p.value;
-        if (p.type === 'second') time.second = +p.value;
-        if (p.type === 'fractionalSecond') time.millis = +('0.' + p.value) * 1000;
-      });
-      return time;
+<script>
+  // Sample data mimicking PS3 categories and their apps
+  const menuData = [
+    {
+      icon: '🎮',
+      label: 'Games',
+      items: ['Uncharted', 'God of War', 'Gran Turismo', 'LittleBigPlanet']
+    },
+    {
+      icon: '🎵',
+      label: 'Music',
+      items: ['All Songs', 'Playlists', 'Artists', 'Albums']
+    },
+    {
+      icon: '🎥',
+      label: 'Videos',
+      items: ['Movies', 'TV Shows', 'Trailers', 'YouTube']
+    },
+    {
+      icon: '⚙️',
+      label: 'Settings',
+      items: ['System Settings', 'Network Settings', 'Sound Settings', 'Display Settings']
+    },
+    {
+      icon: '📷',
+      label: 'Photo',
+      items: ['View Photos', 'Slideshow', 'Albums', 'Upload']
     }
+  ];
 
-    function drawSolarSystem(time) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // DOM references
+  const mainMenu = document.getElementById('mainMenu');
+  const subMenu = document.getElementById('subMenu');
 
-      const totalSeconds =
-        time.hour * 3600 + time.minute * 60 + time.second + (time.millis || 0) / 1000;
+  // State
+  let mainIndex = 0;
+  let subIndex = 0;
 
-      const earthOrbitRadius = 120;
-      const moonOrbitRadius = 20;
+  // Render main menu
+  function renderMainMenu() {
+    mainMenu.innerHTML = '';
+    menuData.forEach((menu, i) => {
+      const div = document.createElement('div');
+      div.classList.add('main-item');
+      if (i === mainIndex) div.classList.add('selected');
+      div.setAttribute('data-index', i);
 
-      const earthAngle = (totalSeconds / 86400) * 2 * Math.PI;
-      const moonAngle = (totalSeconds / 3600) * 2 * Math.PI;
+      const icon = document.createElement('div');
+      icon.className = 'main-icon';
+      icon.textContent = menu.icon;
 
-      const earthX = centerX + earthOrbitRadius * Math.cos(earthAngle);
-      const earthY = centerY + earthOrbitRadius * Math.sin(earthAngle);
-      const moonX = earthX + moonOrbitRadius * Math.cos(moonAngle);
-      const moonY = earthY + moonOrbitRadius * Math.sin(moonAngle);
+      const label = document.createElement('div');
+      label.className = 'main-label';
+      label.textContent = menu.label;
 
-      if (viewMode === 'default') {
-        // Sun
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
-        ctx.fillStyle = 'yellow';
-        ctx.fill();
-
-        // Earth
-        ctx.beginPath();
-        ctx.arc(earthX, earthY, 12, 0, Math.PI * 2);
-        ctx.fillStyle = 'blue';
-        ctx.fill();
-
-        // Moon
-        ctx.beginPath();
-        ctx.arc(moonX, moonY, 4, 0, Math.PI * 2);
-        ctx.fillStyle = 'lightgray';
-        ctx.fill();
-      } else if (viewMode === 'earth-moon') {
-        // Zoomed Earth centered
-        const zoomCenterX = centerX;
-        const zoomCenterY = centerY;
-
-        ctx.beginPath();
-        ctx.arc(zoomCenterX, zoomCenterY, 60, 0, Math.PI * 2);
-        ctx.fillStyle = 'blue';
-        ctx.fill();
-
-        const zoomMoonX = zoomCenterX + 100 * Math.cos(moonAngle);
-        const zoomMoonY = zoomCenterY + 100 * Math.sin(moonAngle);
-
-        ctx.beginPath();
-        ctx.arc(zoomMoonX, zoomMoonY, 16, 0, Math.PI * 2);
-        ctx.fillStyle = 'lightgray';
-        ctx.fill();
-      }
-    }
-
-    function updateClockDisplay() {
-      const now = new Date();
-      const timeZone = timeZoneMap[selectedTimeZone];
-      const timeString = now.toLocaleTimeString('en-US', {
-        timeZone,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-        timeZoneName: 'short'
-      });
-      document.getElementById('main-clock').textContent = `${selectedTimeZone}: ${timeString}`;
-    }
-
-    function animate() {
-      const time = getTimeInZone(selectedTimeZone);
-      drawSolarSystem(time);
-      requestAnimationFrame(animate);
-    }
-
-    document.getElementById('timezone-select').addEventListener('change', (e) => {
-      selectedTimeZone = e.target.value;
+      div.appendChild(icon);
+      div.appendChild(label);
+      mainMenu.appendChild(div);
     });
+  }
 
-    document.getElementById('view-select').addEventListener('change', (e) => {
-      viewMode = e.target.value;
+  // Render submenu
+  function renderSubMenu() {
+    subMenu.innerHTML = '';
+    const items = menuData[mainIndex].items;
+    items.forEach((item, i) => {
+      const div = document.createElement('div');
+      div.classList.add('sub-item');
+      if (i === subIndex) div.classList.add('selected');
+      div.textContent = item;
+      div.setAttribute('data-index', i);
+      subMenu.appendChild(div);
     });
+  }
 
-    setInterval(updateClockDisplay, 1000);
-    animate();
-    updateClockDisplay();
-  </script>
+  // Update display based on current indexes
+  function updateDisplay() {
+    renderMainMenu();
+    renderSubMenu();
+  }
+
+  // Handle key input
+  function handleKey(e) {
+    const itemsLength = menuData[mainIndex].items.length;
+    switch (e.key) {
+      case 'ArrowLeft':
+        mainIndex = (mainIndex - 1 + menuData.length) % menuData.length;
+        subIndex = 0;
+        updateDisplay();
+        break;
+      case 'ArrowRight':
+        mainIndex = (mainIndex + 1) % menuData.length;
+        subIndex = 0;
+        updateDisplay();
+        break;
+      case 'ArrowUp':
+        subIndex = (subIndex - 1 + itemsLength) % itemsLength;
+        updateDisplay();
+        break;
+      case 'ArrowDown':
+        subIndex = (subIndex + 1) % itemsLength;
+        updateDisplay();
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        const selectedMain = menuData[mainIndex].label;
+        const selectedSub = menuData[mainIndex].items[subIndex];
+        alert(`Selected: ${selectedMain} > ${selectedSub}`);
+        break;
+    }
+  }
+
+  // Initialize
+  updateDisplay();
+  window.addEventListener('keydown', handleKey);
+</script>
 </body>
-</html> 
+</html>
