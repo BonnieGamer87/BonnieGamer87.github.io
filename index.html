@@ -1,198 +1,508 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>PS3 Home Screen Demo</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PS3 XMB-style Menu (Keyboard Navigation)</title>
 <style>
-  body {
-    background: #000;
-    color: white;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    overflow: hidden;
+  :root{
+    --bg1:#0b1220;
+    --bg2:#1a2230;
+    --accent: #00aaff;
+    --muted: rgba(255,255,255,0.14);
+    --glass: rgba(255,255,255,0.04);
   }
-  .container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    padding: 40px;
-    box-sizing: border-box;
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:#fff;
+    background:
+      radial-gradient(1200px 600px at 80% 20%, rgba(255,255,255,0.03), transparent 10%),
+      linear-gradient(180deg,var(--bg1),var(--bg2));
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    overflow:hidden;
   }
-  /* Main menu: horizontal list */
-  .main-menu {
-    display: flex;
-    justify-content: center;
-    gap: 60px;
-    margin-bottom: 30px;
+
+  /* subtle wave background (PS3-like) */
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background-image: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 50%, rgba(255,255,255,0.02) 100%);
+    transform:rotate(-6deg) translateY(-40px);
+    filter: blur(12px) contrast(.9);
+    pointer-events:none;
+    z-index:0;
   }
-  .main-item {
-    text-align: center;
-    cursor: pointer;
-    opacity: 0.6;
-    transition: opacity 0.3s, transform 0.3s;
-    user-select: none;
+
+  .container{
+    position:relative;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:28px;
+    padding:28px;
+    box-sizing:border-box;
+    z-index:1;
   }
-  .main-item.selected {
-    opacity: 1;
-    transform: scale(1.2);
+
+  /* Category strip (horizontal) */
+  .categories{
+    display:flex;
+    gap:34px;
+    align-items:end;
+    justify-content:center;
+    transform:translateY(-12px);
+    user-select:none;
+    min-width:60%;
   }
-  .main-icon {
-    font-size: 48px;
-    margin-bottom: 10px;
+
+  .category{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    width:110px;
+    transition:transform .22s cubic-bezier(.2,.9,.3,1), filter .22s;
+    transform-origin:center bottom;
+    color:rgba(255,255,255,0.86);
+    text-align:center;
+    cursor:default;
   }
-  .main-label {
-    font-size: 18px;
+
+  .category .icon{
+    font-size:36px;
+    width:78px;
+    height:78px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    box-shadow: 0 8px 18px rgba(0,0,0,0.45), inset 0 -2px 6px rgba(255,255,255,0.02);
+    transition:transform .22s, box-shadow .22s, background .22s;
   }
-  /* Submenu: vertical list */
-  .sub-menu {
-    width: 300px;
-    margin: 0 auto;
-    background: #222;
-    border-radius: 8px;
-    padding: 10px 0;
-    box-shadow: 0 0 20px #00aaff;
+
+  .category .label{
+    margin-top:10px;
+    font-size:14px;
+    letter-spacing:.6px;
+    opacity:.95;
   }
-  .sub-item {
-    padding: 10px 20px;
-    font-size: 16px;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: background 0.3s, opacity 0.3s;
-    user-select: none;
+
+  .category.selected{
+    transform:translateY(-16px) scale(1.12);
   }
-  .sub-item.selected {
-    background: #00aaff;
-    opacity: 1;
+  .category.selected .icon{
+    transform:scale(1.12);
+    box-shadow: 0 18px 30px rgba(0,0,0,0.6), 0 0 18px rgba(0,170,255,0.12);
+    background: linear-gradient(180deg, rgba(0,170,255,0.12), rgba(0,170,255,0.04));
+    border: 1px solid rgba(0,170,255,0.12);
+  }
+
+  /* Reflection under categories (subtle) */
+  .category .reflection{
+    height:6px;
+    width:78px;
+    margin-top:8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.0));
+    opacity:0.35;
+    border-radius:6px;
+    visibility:hidden;
+  }
+  .category.selected .reflection{ visibility:visible; }
+
+  /* Items panel (vertical) */
+  .items-panel{
+    width:720px;
+    max-width:92vw;
+    min-height:160px;
+    padding:20px 22px;
+    border-radius:14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    display:flex;
+    gap:18px;
+    align-items:flex-start;
+  }
+
+  .items-list{
+    flex:1 1 auto;
+  }
+
+  .item{
+    display:flex;
+    gap:14px;
+    align-items:center;
+    padding:12px 14px;
+    border-radius:10px;
+    margin-bottom:10px;
+    transition:background .18s, transform .18s;
+    cursor:default;
+    color:rgba(255,255,255,0.9);
+  }
+  .item:last-child{ margin-bottom:0; }
+
+  .item .thumb{
+    width:72px;
+    height:48px;
+    border-radius:8px;
+    background:var(--glass);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:600;
+    font-size:14px;
+    flex:0 0 72px;
+  }
+  .item .meta{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .item .title{
+    font-size:16px;
+    letter-spacing:.2px;
+  }
+  .item .sub{
+    font-size:12px;
+    color:rgba(255,255,255,0.55);
+  }
+
+  .item.selected{
+    background: linear-gradient(90deg, rgba(0,170,255,0.06), rgba(255,255,255,0.01));
+    transform:translateX(8px);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.45);
+    border-left:4px solid var(--accent);
+  }
+
+  /* Right side preview */
+  .preview{
+    width:240px;
+    min-width:200px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    align-items:center;
+    justify-content:center;
+  }
+  .preview .screen{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.28), rgba(255,255,255,0.02));
+    height:120px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:rgba(255,255,255,0.95);
+    text-align:center;
+    font-size:13px;
+    line-height:1.2;
+  }
+  .preview .small{
+    font-size:12px;
+    color:rgba(255,255,255,0.6);
+  }
+
+  /* bottom hints */
+  .hints{
+    position:fixed;
+    bottom:18px;
+    left:50%;
+    transform:translateX(-50%);
+    display:flex;
+    gap:18px;
+    align-items:center;
+    padding:8px 14px;
+    border-radius:999px;
+    background:rgba(0,0,0,0.22);
+    color:rgba(255,255,255,0.85);
+    font-size:13px;
+    z-index:2;
+  }
+
+  /* selection overlay */
+  .overlay{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.68));
+    z-index:50;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s;
+  }
+  .overlay.visible{
+    opacity:1;
+    pointer-events:auto;
+  }
+  .overlay .card{
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+    padding:22px;
+    border-radius:12px;
+    min-width:320px;
+    text-align:center;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.7);
+  }
+  .overlay .title{ font-size:18px; margin-bottom:8px; }
+  .overlay .subtitle{ font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:10px; }
+
+  @media (max-width:820px){
+    .items-panel{flex-direction:column; align-items:stretch; gap:12px;}
+    .preview{width:100%;}
+    .categories{gap:18px;}
+    .category{width:96px;}
   }
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="main-menu" id="mainMenu">
-      <!-- main menu items will go here -->
+  <div class="container" role="application" aria-label="PS3 XMB style menu">
+    <div class="categories" id="categories"></div>
+
+    <div class="items-panel" id="itemsPanel" aria-live="polite">
+      <div class="items-list" id="itemsList"></div>
+      <div class="preview" id="preview">
+        <div class="screen" id="previewScreen">Select an item to see preview</div>
+        <div class="small">Press Enter / Space to open • Use arrow keys to navigate</div>
+      </div>
     </div>
-    <div class="sub-menu" id="subMenu">
-      <!-- submenu items here -->
+  </div>
+
+  <div class="hints">
+    <div>◀ ▶ - Categories</div>
+    <div>▲ ▼ - Items</div>
+    <div>⏎ / Space - Select</div>
+    <div>Esc - Close selection</div>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="card" role="dialog" aria-modal="true">
+      <div class="title" id="overlayTitle">Opening...</div>
+      <div class="subtitle" id="overlaySubtitle">Simulated action — press Esc or Enter to close.</div>
+      <div style="margin-top:12px;"><button id="closeBtn" style="padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#001;cursor:pointer;font-weight:600;">Close</button></div>
     </div>
   </div>
 
 <script>
-  // Sample data mimicking PS3 categories and their apps
-  const menuData = [
-    {
-      icon: '🎮',
-      label: 'Games',
-      items: ['Uncharted', 'God of War', 'Gran Turismo', 'LittleBigPlanet']
-    },
-    {
-      icon: '🎵',
-      label: 'Music',
-      items: ['All Songs', 'Playlists', 'Artists', 'Albums']
-    },
-    {
-      icon: '🎥',
-      label: 'Videos',
-      items: ['Movies', 'TV Shows', 'Trailers', 'YouTube']
-    },
-    {
-      icon: '⚙️',
-      label: 'Settings',
-      items: ['System Settings', 'Network Settings', 'Sound Settings', 'Display Settings']
-    },
-    {
-      icon: '📷',
-      label: 'Photo',
-      items: ['View Photos', 'Slideshow', 'Albums', 'Upload']
-    }
+(function(){
+  // Menu data: categories and items. Edit/add as desired.
+  const menu = [
+    { id:'game',  icon:'🎮', label:'Game', items:[
+      { title:'Game Data Utility', subtitle:'Saved data & profiles' },
+      { title:'Trophy Collection', subtitle:'View trophies' },
+      { title:'Saved Files Utility (PS3™)', subtitle:'Saved data manager' },
+      { title:'Install Package Files', subtitle:'(dev system)' },
+    ]},
+    { id:'video', icon:'🎞️', label:'Video', items:[
+      { title:'Video Library', subtitle:'Movies & clips' },
+      { title:'Video Store', subtitle:'Download movies' },
+      { title:'Play Video', subtitle:'Open media player' },
+    ]},
+    { id:'music', icon:'🎵', label:'Music', items:[
+      { title:'Music Library', subtitle:'Songs & playlists' },
+      { title:'Rip Disc', subtitle:'Rip audio CD' },
+      { title:'Party', subtitle:'Party settings' },
+    ]},
+    { id:'network', icon:'🌐', label:'Network', items:[
+      { title:'Internet Browser', subtitle:'Open web browser' },
+      { title:'Friends', subtitle:'Friends list & chat' },
+      { title:'Account Management', subtitle:'PSN account settings' },
+    ]},
+    { id:'settings', icon:'⚙️', label:'Settings', items:[
+      { title:'System Settings', subtitle:'General system options' },
+      { title:'Display Settings', subtitle:'Video & resolution' },
+      { title:'Network Settings', subtitle:'Internet setup' },
+      { title:'Accessory Settings', subtitle:'Controllers & peripherals' },
+    ]},
+    { id:'photo', icon:'🖼️', label:'Photo', items:[
+      { title:'Photo Gallery', subtitle:'View images' },
+      { title:'Slideshow', subtitle:'Start slideshow' },
+    ]},
   ];
 
-  // DOM references
-  const mainMenu = document.getElementById('mainMenu');
-  const subMenu = document.getElementById('subMenu');
-
   // State
-  let mainIndex = 0;
-  let subIndex = 0;
+  let catIndex = 0;
+  let itemIndices = new Array(menu.length).fill(0);
 
-  // Render main menu
-  function renderMainMenu() {
-    mainMenu.innerHTML = '';
-    menuData.forEach((menu, i) => {
-      const div = document.createElement('div');
-      div.classList.add('main-item');
-      if (i === mainIndex) div.classList.add('selected');
-      div.setAttribute('data-index', i);
+  // Elements
+  const categoriesEl = document.getElementById('categories');
+  const itemsListEl = document.getElementById('itemsList');
+  const previewScreen = document.getElementById('previewScreen');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlaySubtitle = document.getElementById('overlaySubtitle');
+  const closeBtn = document.getElementById('closeBtn');
 
-      const icon = document.createElement('div');
-      icon.className = 'main-icon';
-      icon.textContent = menu.icon;
-
-      const label = document.createElement('div');
-      label.className = 'main-label';
-      label.textContent = menu.label;
-
-      div.appendChild(icon);
-      div.appendChild(label);
-      mainMenu.appendChild(div);
+  // Render categories
+  function renderCategories(){
+    categoriesEl.innerHTML = '';
+    menu.forEach((c, i) => {
+      const cat = document.createElement('div');
+      cat.className = 'category' + (i===catIndex ? ' selected' : '');
+      cat.dataset.index = i;
+      cat.setAttribute('role','button');
+      cat.setAttribute('aria-pressed', i===catIndex ? 'true' : 'false');
+      cat.innerHTML = `
+        <div class="icon" aria-hidden="true">${c.icon}</div>
+        <div class="label">${c.label}</div>
+        <div class="reflection"></div>
+      `;
+      // click support too
+      cat.addEventListener('click', ()=> {
+        catIndex = Number(cat.dataset.index);
+        // reset item pointer for that category if out of range
+        if (itemIndices[catIndex] >= menu[catIndex].items.length) itemIndices[catIndex]=0;
+        refresh();
+      });
+      categoriesEl.appendChild(cat);
     });
   }
 
-  // Render submenu
-  function renderSubMenu() {
-    subMenu.innerHTML = '';
-    const items = menuData[mainIndex].items;
-    items.forEach((item, i) => {
-      const div = document.createElement('div');
-      div.classList.add('sub-item');
-      if (i === subIndex) div.classList.add('selected');
-      div.textContent = item;
-      div.setAttribute('data-index', i);
-      subMenu.appendChild(div);
+  // Render items for selected category
+  function renderItems(){
+    const cat = menu[catIndex];
+    itemsListEl.innerHTML = '';
+    cat.items.forEach((it, idx) => {
+      const item = document.createElement('div');
+      item.className = 'item' + (idx===itemIndices[catIndex] ? ' selected' : '');
+      item.dataset.index = idx;
+      item.innerHTML = `
+        <div class="thumb">${cat.icon}</div>
+        <div class="meta">
+          <div class="title">${it.title}</div>
+          <div class="sub">${it.subtitle || ''}</div>
+        </div>
+      `;
+      item.addEventListener('click', ()=>{
+        itemIndices[catIndex] = Number(item.dataset.index);
+        refresh();
+        openSelection();
+      });
+      itemsListEl.appendChild(item);
     });
   }
 
-  // Update display based on current indexes
-  function updateDisplay() {
-    renderMainMenu();
-    renderSubMenu();
+  // Update preview info
+  function updatePreview(){
+    const cat = menu[catIndex];
+    const it = cat.items[itemIndices[catIndex]] || {};
+    previewScreen.innerHTML = `<strong style="font-size:15px">${it.title || 'No item'}</strong><div style="margin-top:8px;font-size:13px;color:rgba(255,255,255,0.75)">${it.subtitle || ''}</div>`;
   }
 
-  // Handle key input
-  function handleKey(e) {
-    const itemsLength = menuData[mainIndex].items.length;
-    switch (e.key) {
-      case 'ArrowLeft':
-        mainIndex = (mainIndex - 1 + menuData.length) % menuData.length;
-        subIndex = 0;
-        updateDisplay();
-        break;
-      case 'ArrowRight':
-        mainIndex = (mainIndex + 1) % menuData.length;
-        subIndex = 0;
-        updateDisplay();
-        break;
-      case 'ArrowUp':
-        subIndex = (subIndex - 1 + itemsLength) % itemsLength;
-        updateDisplay();
-        break;
-      case 'ArrowDown':
-        subIndex = (subIndex + 1) % itemsLength;
-        updateDisplay();
-        break;
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        const selectedMain = menuData[mainIndex].label;
-        const selectedSub = menuData[mainIndex].items[subIndex];
-        alert(`Selected: ${selectedMain} > ${selectedSub}`);
-        break;
+  // Refresh UI state
+  function refresh(){
+    // categories
+    Array.from(categoriesEl.children).forEach((el, i) => {
+      el.classList.toggle('selected', i===catIndex);
+      el.setAttribute('aria-pressed', i===catIndex ? 'true' : 'false');
+    });
+    // items
+    renderItems();
+    updatePreview();
+    // ensure selected item is visible (if items panel becomes scrollable)
+    const selectedEl = itemsListEl.querySelector('.item.selected');
+    if(selectedEl){
+      selectedEl.scrollIntoView({block:'nearest', behavior:'smooth'});
     }
   }
 
-  // Initialize
-  updateDisplay();
-  window.addEventListener('keydown', handleKey);
+  // Navigation handlers
+  function moveCategory(dir){
+    catIndex = (catIndex + dir + menu.length) % menu.length;
+    // ensure item index valid
+    if (itemIndices[catIndex] >= menu[catIndex].items.length) itemIndices[catIndex] = 0;
+    refresh();
+  }
+
+  function moveItem(dir){
+    const len = menu[catIndex].items.length;
+    const cur = itemIndices[catIndex];
+    itemIndices[catIndex] = (cur + dir + len) % len;
+    refresh();
+  }
+
+  // selection "open"
+  function openSelection(){
+    const cat = menu[catIndex];
+    const it = cat.items[itemIndices[catIndex]] || {};
+    overlayTitle.textContent = (it.title ? `Open: ${it.title}` : 'Opening...');
+    overlaySubtitle.textContent = `${cat.label} • ${it.subtitle || ''}`;
+    overlay.classList.add('visible');
+    overlay.setAttribute('aria-hidden','false');
+    // focus close button for keyboard users
+    closeBtn.focus();
+  }
+
+  function closeSelection(){
+    overlay.classList.remove('visible');
+    overlay.setAttribute('aria-hidden','true');
+    // return keyboard focus to body so navigation works
+    document.body.focus();
+  }
+
+  // initial render
+  renderCategories();
+  renderItems();
+  updatePreview();
+
+  // keyboard handling
+  window.addEventListener('keydown', (e) => {
+    const key = e.key;
+    // If overlay visible, let Enter/Escape close it
+    if (overlay.classList.contains('visible')){
+      if (key === 'Escape' || key === 'Enter' || key === ' '){
+        e.preventDefault();
+        closeSelection();
+      }
+      return;
+    }
+
+    if (key === 'ArrowLeft'){
+      e.preventDefault();
+      moveCategory(-1);
+    } else if (key === 'ArrowRight'){
+      e.preventDefault();
+      moveCategory(1);
+    } else if (key === 'ArrowUp'){
+      e.preventDefault();
+      moveItem(-1);
+    } else if (key === 'ArrowDown'){
+      e.preventDefault();
+      moveItem(1);
+    } else if (key === 'Enter' || key === ' '){
+      e.preventDefault();
+      openSelection();
+    }
+  });
+
+  // overlay close button
+  closeBtn.addEventListener('click', closeSelection);
+
+  // also close overlay on ESC globally
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlay.classList.contains('visible')){
+      closeSelection();
+    }
+  });
+
+  // small focus trick for accessibility: make body focusable then focus it
+  document.body.tabIndex = -1;
+  document.body.focus();
+
+  // Expose some debugging controls if needed (optional)
+  window.XMB = {
+    getState: ()=>({catIndex, itemIndices}),
+    setCategory: (i)=>{ catIndex = i % menu.length; refresh(); },
+  };
+
+})();
 </script>
 </body>
 </html>
