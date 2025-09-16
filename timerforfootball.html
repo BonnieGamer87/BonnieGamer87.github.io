@@ -21,6 +21,15 @@
       color: #fff;
       height: 100vh;
     }
+    .center-container {
+      background: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+      color: #fff;
+      padding: 40px 60px;
+      border-radius: 20px; /* Rounded edges */
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      text-align: center;
+      max-width: 90%;
+    }
     #message {
       font-size: 3em;
       text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
@@ -31,10 +40,10 @@
   </style>
 </head>
 <body>
-
+<div id="center-container">
   <div id="message">Checking schedule...</div>
   <div id="countdown"></div>
-
+</div>
   <script>
     // Define your stream schedule here
     // Format: "MM/DD HH:MM" (24-hour format)
