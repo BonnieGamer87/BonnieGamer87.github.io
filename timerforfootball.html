@@ -15,16 +15,30 @@
       align-items: center;
       text-align: center;
       flex-direction: column;
-      /* Local background image */
+
+      /* Background image */
       background: url('Modocbanner.png') no-repeat center center fixed;
       background-size: cover;
+
+      /* Animation */
+      animation: moveBackground 30s linear infinite;
       color: #fff;
       height: 100vh;
     }
+
+    @keyframes moveBackground {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
     #center-container {
-      background: rgba(0, 0, 0, 0.750); /* Semi-transparent background */
+      background: rgba(0, 0, 0, 0.75); /* Semi-transparent background */
       color: #fff;
-      padding: 100px 180px;
+      padding: 100px 160px;
       border-radius: 20px; /* Rounded edges */
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
       text-align: center;
@@ -44,54 +58,54 @@
   <div id="message">Checking schedule...</div>
   <div id="countdown"></div>
 </div>
-  <script>
-    // Define your stream schedule here
-    // Format: "MM/DD HH:MM" (24-hour format)
-    const schedule = [
-      "09/16 11:20",
-      "09/17 10:30",
-      "09/18 15:45",
-      "09/19 08:00"
-    ];
 
-    function parseDateTime(str) {
-      const [md, hm] = str.split(' ');
-      const [month, day] = md.split('/').map(Number);
-      const [hour, minute] = hm.split(':').map(Number);
-      const now = new Date();
-      const year = now.getFullYear();
-      return new Date(year, month - 1, day, hour, minute, 0);
-    }
+<script>
+  // Define your stream schedule here
+  const schedule = [
+    "09/16 11:20",
+    "09/17 10:30",
+    "09/18 15:45",
+    "09/19 08:00"
+  ];
 
+  function parseDateTime(str) {
+    const [md, hm] = str.split(' ');
+    const [month, day] = md.split('/').map(Number);
+    const [hour, minute] = hm.split(':').map(Number);
     const now = new Date();
-    const futureEvents = schedule
-      .map(parseDateTime)
-      .filter(date => date > now)
-      .sort((a, b) => a - b);
+    const year = now.getFullYear();
+    return new Date(year, month - 1, day, hour, minute, 0);
+  }
 
-    const nextEvent = futureEvents.length ? futureEvents[0] : null;
+  const now = new Date();
+  const futureEvents = schedule
+    .map(parseDateTime)
+    .filter(date => date > now)
+    .sort((a, b) => a - b);
 
-    const messageEl = document.getElementById("message");
+  const nextEvent = futureEvents.length ? futureEvents[0] : null;
 
-    if (!nextEvent) {
-      messageEl.textContent = "No upcoming streams scheduled.";
-    } else {
-      function updateMessage() {
-        const now = new Date();
-        const timeDiff = nextEvent.getTime() - now.getTime();
-        const secondsUntil = Math.floor(timeDiff / 1000);
+  const messageEl = document.getElementById("message");
 
-        if (secondsUntil <= 0) {
-          messageEl.textContent = "⏰ Stream is live!";
-          clearInterval(timer);
-        } else {
-          messageEl.textContent = "Stream starts soon";
-        }
+  if (!nextEvent) {
+    messageEl.textContent = "No upcoming streams scheduled.";
+  } else {
+    function updateMessage() {
+      const now = new Date();
+      const timeDiff = nextEvent.getTime() - now.getTime();
+      const secondsUntil = Math.floor(timeDiff / 1000);
+
+      if (secondsUntil <= 0) {
+        messageEl.textContent = "⏰ Stream is live!";
+        clearInterval(timer);
+      } else {
+        messageEl.textContent = "Stream starts soon";
       }
-
-      updateMessage();
-      const timer = setInterval(updateMessage, 1000);
     }
-  </script>
+
+    updateMessage();
+    const timer = setInterval(updateMessage, 1000);
+  }
+</script>
 </body>
 </html>
