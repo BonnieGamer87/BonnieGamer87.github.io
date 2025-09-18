@@ -27,85 +27,220 @@
     }
 
     @keyframes moveBackground {
-  from {
-    background-position: 50% 0;
-  }
-  to {
-    background-position: 0 0;
-  }
-}
+      from {
+        background-position: 50% 0;
+      }
+      to {
+        background-position: 0 0;
+      }
+    }
 
     #center-container {
-      background: rgba(0, 0, 0, 0.75); /* Semi-transparent background */
+      background: rgba(0, 0, 0, 0.75);
       color: #fff;
       padding: 250px 240px;
-      border-radius: 40px; /* Rounded edges */
+      border-radius: 40px;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
       text-align: center;
       max-width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* center horizontally */
     }
+
     #message {
       font-size: 5em;
       text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
     }
+
     #countdown {
+      font-size: 3em;
+      margin-top: 20px;
       display: none;
+    }
+
+    /* Removed #player styling since we won't use it for iframe anymore */
+
+    #iframe-container {
+      margin-top: 30px;
+      width: 800px;
+      height: 450px;
+      max-width: 100%;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+    }
+
+    #iframe-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    @media (max-width: 850px) {
+      #iframe-container {
+        width: 100%;
+        height: 300px;
+      }
+
+      #center-container {
+        padding: 80px 40px;
+      }
+
+      #message {
+        font-size: 3em;
+      }
+
+      #countdown {
+        font-size: 2em;
+      }
     }
   </style>
 </head>
 <body>
-<div id="center-container">
-  <div id="message">Checking schedule...</div>
-  <div id="countdown"></div>
-</div>
+  <div id="center-container">
+    <div id="message">Checking schedule...</div>
+    <div id="countdown"></div>
+    <div id="iframe-container" style="display: none;">
+      <!-- iframe will be inserted here dynamically -->
+    </div>
+  </div>
 
-<script>
-  // Define your stream schedule here
-  const schedule = [
-    "09/16 11:20",
-    "09/17 10:30",
-    "09/18 11:12",
-    "09/19 08:00"
-  ];
+  <script>
+    // Stream URLs (replace these with your actual stream URLs)
+    const streamUrls = [
+      'https://my.clevr.media/lavegastadium', 
+      'https://my.clevr.media/modocmedia',
+      'https://my.clevr.media/lavegaisd'
+    ];
 
-  function parseDateTime(str) {
-    const [md, hm] = str.split(' ');
-    const [month, day] = md.split('/').map(Number);
-    const [hour, minute] = hm.split(':').map(Number);
-    const now = new Date();
-    const year = now.getFullYear();
-    return new Date(year, month - 1, day, hour, minute, 0);
-  }
+    // Function to check if the stream is live by trying to load the URL in an iframe
+    function checkIfStreamIsLive(url) {
+      return new Promise((resolve) => {
+        let iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.style.display = 'none';
 
-  const now = new Date();
-  const futureEvents = schedule
-    .map(parseDateTime)
-    .filter(date => date > now)
-    .sort((a, b) => a - b);
+        // If iframe loads, consider stream live
+        iframe.onload = () => {
+          document.body.removeChild(iframe);
+          resolve(true);
+        };
+        iframe.onerror = () => {
+          document.body.removeChild(iframe);
+          resolve(false);
+        };
+        document.body.appendChild(iframe);
 
-  const nextEvent = futureEvents.length ? futureEvents[0] : null;
-
-  const messageEl = document.getElementById("message");
-
-  if (!nextEvent) {
-    messageEl.textContent = "No upcoming streams scheduled.";
-  } else {
-    function updateMessage() {
-      const now = new Date();
-      const timeDiff = nextEvent.getTime() - now.getTime();
-      const secondsUntil = Math.floor(timeDiff / 1000);
-
-      if (secondsUntil <= 0) {
-        messageEl.textContent = "⏰ Stream is live!";
-        clearInterval(timer);
-      } else {
-        messageEl.textContent = "Stream starts soon";
-      }
+        // Timeout after 5 seconds in case no response
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+            resolve(false);
+          }
+        }, 5000);
+      });
     }
 
-    updateMessage();
-    const timer = setInterval(updateMessage, 1000);
-  }
-</script>
+    // Function to load the stream iframe into #iframe-container
+    function loadStream(url) {
+      const container = document.getElementById('iframe-container');
+      container.innerHTML = `
+        <iframe 
+          src="${url}" 
+          frameborder="0" 
+          allow="autoplay; fullscreen" 
+          webkitallowfullscreen="true" 
+          mozallowfullscreen="true" 
+          allowfullscreen="true"
+        ></iframe>
+      `;
+      container.style.display = 'block';
+    }
+
+    // Check streams in order and load first live stream found
+    async function checkStreams() {
+      for (let i = 0; i < streamUrls.length; i++) {
+        const isLive = await checkIfStreamIsLive(streamUrls[i]);
+        if (isLive) {
+          loadStream(streamUrls[i]);
+          return;
+        }
+      }
+      // No live stream found
+      document.getElementById('iframe-container').style.display = 'none';
+      document.getElementById('message').textContent = "No stream is currently live.";
+    }
+
+    // Schedule and countdown logic
+
+    const schedule = [
+      "09/16 11:20",
+      "09/17 10:30",
+      "09/18 11:24",
+      "09/19 08:00"
+    ];
+
+    function parseDateTime(str) {
+      const [md, hm] = str.split(' ');
+      const [month, day] = md.split('/').map(Number);
+      const [hour, minute] = hm.split(':').map(Number);
+      const now = new Date();
+      const year = now.getFullYear();
+      return new Date(year, month - 1, day, hour, minute, 0);
+    }
+
+    const now = new Date();
+    const today = now.toDateString();
+
+    const futureEvents = schedule
+      .map(parseDateTime)
+      .filter(date => date.toDateString() === today && date > now)
+      .sort((a, b) => a - b);
+
+    const nextEvent = futureEvents.length ? futureEvents[0] : null;
+
+    const messageEl = document.getElementById("message");
+    const countdownEl = document.getElementById("countdown");
+    const iframeContainer = document.getElementById("iframe-container");
+
+    if (!nextEvent) {
+      messageEl.textContent = "No upcoming stream today.";
+    } else {
+      countdownEl.style.display = "block";
+
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const totalDuration = nextEvent - startOfDay;
+
+      function updateCountdown() {
+        const current = new Date();
+        const elapsed = current - startOfDay;
+        const remaining = totalDuration - elapsed;
+
+        if (remaining <= 0) {
+          clearInterval(timer);
+          messageEl.textContent = "🎬 Stream is Live!";
+          countdownEl.style.display = "none";
+          // Show iframe container and check streams
+          iframeContainer.style.display = "block";
+          checkStreams();
+          return;
+        }
+
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+
+        messageEl.textContent = "Countdown to stream:";
+        countdownEl.textContent = `${hours.toString().padStart(2, '0')}:${minutes
+          .toString()
+          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+
+      updateCountdown();
+      const timer = setInterval(updateCountdown, 1000);
+    }
+  </script>
 </body>
 </html>
