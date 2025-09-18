@@ -46,11 +46,26 @@
       display: flex;
       flex-direction: column;
       align-items: center; /* center horizontally */
+      height: auto; /* ensure natural height */
+      width: auto;
+      position: relative;
+    }
+
+    /* New styles to make iframe fill center-container */
+    #center-container.fill-iframe {
+      padding: 0 !important; /* remove padding to fill */
+      height: 450px; /* fix height same as iframe-container original height */
+      width: 800px;  /* fix width same as iframe-container original width */
+      border-radius: 40px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
     }
 
     #message {
       font-size: 5em;
       text-shadow: 2px 2px 6px rgba(0,0,0,0.8);
+      margin: 0;
+      padding: 0;
     }
 
     #countdown {
@@ -58,8 +73,6 @@
       margin-top: 20px;
       display: none;
     }
-
-    /* Removed #player styling since we won't use it for iframe anymore */
 
     #iframe-container {
       margin-top: 30px;
@@ -69,6 +82,17 @@
       border-radius: 20px;
       overflow: hidden;
       box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+      display: none;
+      position: relative;
+    }
+
+    /* When filling center-container */
+    #iframe-container.fill-iframe {
+      width: 100% !important;
+      height: 100% !important;
+      margin-top: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
     }
 
     #iframe-container iframe {
@@ -76,6 +100,11 @@
       height: 100%;
       border: none;
       display: block;
+    }
+
+    #iframe-container.fill-iframe iframe {
+      width: 100% !important;
+      height: 100% !important;
     }
 
     @media (max-width: 850px) {
@@ -102,7 +131,7 @@
   <div id="center-container">
     <div id="message">Checking schedule...</div>
     <div id="countdown"></div>
-    <div id="iframe-container" style="display: none;">
+    <div id="iframe-container">
       <!-- iframe will be inserted here dynamically -->
     </div>
   </div>
@@ -144,16 +173,21 @@
     }
 
     // Function to load the stream iframe into #iframe-container
-    function loadStream(url) {
+    function loadStream(url, autoplay = false) {
+      let src = url;
+      if (autoplay) {
+        src += (url.includes('?') ? '&' : '?') + 'autoplay=1';
+      }
       const container = document.getElementById('iframe-container');
       container.innerHTML = `
         <iframe 
-          src="${url}" 
+          src="${src}" 
           frameborder="0" 
           allow="autoplay; fullscreen" 
           webkitallowfullscreen="true" 
           mozallowfullscreen="true" 
           allowfullscreen="true"
+          autoplay="true"
         ></iframe>
       `;
       container.style.display = 'block';
@@ -164,13 +198,16 @@
       for (let i = 0; i < streamUrls.length; i++) {
         const isLive = await checkIfStreamIsLive(streamUrls[i]);
         if (isLive) {
-          loadStream(streamUrls[i]);
+          loadStream(streamUrls[i], true);
           return;
         }
       }
       // No live stream found
-      document.getElementById('iframe-container').style.display = 'none';
-      document.getElementById('message').textContent = "No stream is currently live.";
+      const iframeContainer = document.getElementById('iframe-container');
+      const messageEl = document.getElementById('message');
+      iframeContainer.style.display = 'none';
+      messageEl.style.display = 'block';
+      messageEl.textContent = "No stream is currently live.";
     }
 
     // Schedule and countdown logic
@@ -204,6 +241,7 @@
     const messageEl = document.getElementById("message");
     const countdownEl = document.getElementById("countdown");
     const iframeContainer = document.getElementById("iframe-container");
+    const centerContainer = document.getElementById("center-container");
 
     if (!nextEvent) {
       messageEl.textContent = "No upcoming stream today.";
@@ -222,9 +260,29 @@
           clearInterval(timer);
           messageEl.textContent = "🎬 Stream is Live!";
           countdownEl.style.display = "none";
-          // Show iframe container and check streams
-          iframeContainer.style.display = "block";
-          checkStreams();
+
+          // Add fill classes to make iframe fill center-container
+          centerContainer.classList.add('fill-iframe');
+          iframeContainer.classList.add('fill-iframe');
+
+          // Hide the message (since we have live stream)
+          messageEl.style.display = 'none';
+
+          // Check streams and autoplay first live
+          (async () => {
+            for (let i = 0; i < streamUrls.length; i++) {
+              const isLive = await checkIfStreamIsLive(streamUrls[i]);
+              if (isLive) {
+                loadStream(streamUrls[i], true);
+                return;
+              }
+            }
+            // No live stream found
+            iframeContainer.style.display = 'none';
+            messageEl.style.display = 'block';
+            messageEl.textContent = "No stream is currently live.";
+          })();
+
           return;
         }
 
