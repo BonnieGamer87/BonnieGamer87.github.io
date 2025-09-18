@@ -51,14 +51,17 @@
       position: relative;
     }
 
-    /* New styles to make iframe fill center-container */
+    /* When iframe fills center-container */
     #center-container.fill-iframe {
-      padding: 0 !important; /* remove padding to fill */
-      height: 450px; /* fix height same as iframe-container original height */
-      width: 800px;  /* fix width same as iframe-container original width */
+      padding: 0 !important;
+      width: 800px;
+      height: 450px;
       border-radius: 40px;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
       overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     #message {
@@ -90,7 +93,7 @@
     #iframe-container.fill-iframe {
       width: 100% !important;
       height: 100% !important;
-      margin-top: 0 !important;
+      margin: 0 !important;
       border-radius: 0 !important;
       box-shadow: none !important;
     }
@@ -105,6 +108,8 @@
     #iframe-container.fill-iframe iframe {
       width: 100% !important;
       height: 100% !important;
+      border: none;
+      display: block;
     }
 
     @media (max-width: 850px) {
