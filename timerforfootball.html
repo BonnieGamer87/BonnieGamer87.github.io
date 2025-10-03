@@ -16,23 +16,12 @@
       text-align: center; 
       flex-direction: column;
 
-      /* Background image */
-      background: url('Modocbanner3.png') repeat-x center center fixed;
+      /* Static background image (local or URL) */
+      background: url('Modocbanner3.png') no-repeat center center fixed;
       background-size: cover;
 
-      /* Animation */
-      animation: moveBackground 30s linear infinite;
       color: #fff;
       height: 100vh;
-    }
-
-    @keyframes moveBackground {
-      from {
-        background-position: 50% 0;
-      }
-      to {
-        background-position: 0 0;
-      }
     }
 
     #center-container {
@@ -45,13 +34,12 @@
       max-width: 100%;
       display: flex;
       flex-direction: column;
-      align-items: center; /* center horizontally */
-      height: auto; /* ensure natural height */
+      align-items: center;
+      height: auto;
       width: auto;
       position: relative;
     }
 
-    /* When iframe fills center-container */
     #center-container.fill-iframe {
       padding: 0 !important;
       width: 800px;
@@ -89,7 +77,6 @@
       position: relative;
     }
 
-    /* When filling center-container */
     #iframe-container.fill-iframe {
       width: 100% !important;
       height: 100% !important;
@@ -142,21 +129,18 @@
   </div>
 
   <script>
-    // Stream URLs (replace these with your actual stream URLs)
     const streamUrls = [
       'https://my.clevr.media/lavegastadium', 
       'https://my.clevr.media/modocmedia',
       'https://my.clevr.media/lavegaisd'
     ];
 
-    // Function to check if the stream is live by trying to load the URL in an iframe
     function checkIfStreamIsLive(url) {
       return new Promise((resolve) => {
         let iframe = document.createElement('iframe');
         iframe.src = url;
         iframe.style.display = 'none';
 
-        // If iframe loads, consider stream live
         iframe.onload = () => {
           document.body.removeChild(iframe);
           resolve(true);
@@ -167,7 +151,6 @@
         };
         document.body.appendChild(iframe);
 
-        // Timeout after 5 seconds in case no response
         setTimeout(() => {
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
@@ -177,7 +160,6 @@
       });
     }
 
-    // Function to load the stream iframe into #iframe-container
     function loadStream(url, autoplay = false) {
       let src = url;
       if (autoplay) {
@@ -198,7 +180,6 @@
       container.style.display = 'block';
     }
 
-    // Check streams in order and load first live stream found
     async function checkStreams() {
       for (let i = 0; i < streamUrls.length; i++) {
         const isLive = await checkIfStreamIsLive(streamUrls[i]);
@@ -207,15 +188,12 @@
           return;
         }
       }
-      // No live stream found
       const iframeContainer = document.getElementById('iframe-container');
       const messageEl = document.getElementById('message');
       iframeContainer.style.display = 'none';
       messageEl.style.display = 'block';
       messageEl.textContent = "No stream is currently live.";
     }
-
-    // Schedule and countdown logic
 
     const schedule = [
       "09/16 11:20",
@@ -266,14 +244,11 @@
           messageEl.textContent = "🎬 Stream is Live!";
           countdownEl.style.display = "none";
 
-          // Add fill classes to make iframe fill center-container
           centerContainer.classList.add('fill-iframe');
           iframeContainer.classList.add('fill-iframe');
 
-          // Hide the message (since we have live stream)
           messageEl.style.display = 'none';
 
-          // Check streams and autoplay first live
           (async () => {
             for (let i = 0; i < streamUrls.length; i++) {
               const isLive = await checkIfStreamIsLive(streamUrls[i]);
@@ -282,7 +257,6 @@
                 return;
               }
             }
-            // No live stream found
             iframeContainer.style.display = 'none';
             messageEl.style.display = 'block';
             messageEl.textContent = "No stream is currently live.";
