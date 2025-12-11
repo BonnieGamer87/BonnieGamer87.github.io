@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Christmas Lights – Long Curvy Wire</title>
+<style>
+    body {
+        background: white;
+        display: flex;
+        justify-content: center;
+        padding-top: 40px;
+    }
+
+    .bulb {
+        animation: blink 2.5s steps(1) infinite;
+        filter: url(#bulbGlow);
+    }
+
+    @keyframes blink {
+        0%, 16%   { fill: red; }
+        17%, 33%  { fill: blue; }
+        34%, 50%  { fill: green; }
+        51%, 67%  { fill: red; }
+        68%, 84%  { fill: blue; }
+        85%, 100% { fill: green; }
+    }
+</style>
+</head>
+<body>
+
+<svg width="1200" height="700" viewBox="0 0 1300 700" overflow="visible">
+
+    <!-- Glow filter -->
+    <defs>
+        <filter id="bulbGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur1"/>
+            <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="blur2"/>
+            <feMerge>
+                <feMergeNode in="blur1"/>
+                <feMergeNode in="blur2"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- ⭐ LONGER CURVY WIRE -->
+    <path id="wire"
+          d="
+          M50 700
+          C150 600,   0 450,    150 350
+          S350 150,   500 300
+          S650 450,   800 300
+          S950 150,   1100 300
+          S1250 450,  1100 700
+          "
+          stroke="black"
+          stroke-width="6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          fill="none"
+    />
+
+    <g id="bulb-container"></g>
+
+    <script>
+        const wire = document.getElementById("wire");
+        const container = document.getElementById("bulb-container");
+
+        const totalBulbs = 40;  // more bulbs for bigger wire
+        const offset = 22;
+
+        const length = wire.getTotalLength();
+
+        for (let i = 0; i < totalBulbs; i++) {
+
+            const p1 = wire.getPointAtLength((i / (totalBulbs - 1)) * length);
+            const p2 = wire.getPointAtLength((i / (totalBulbs - 1)) * length + 1);
+
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const hang = angle + Math.PI / 2;
+
+            const direction = i % 2 === 0 ? 1 : -1;
+
+            const x = p1.x + Math.cos(hang) * offset * direction;
+            const y = p1.y + Math.sin(hang) * offset * direction;
+
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+            const socket = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            socket.setAttribute("x", -5);
+            socket.setAttribute("y", -20);
+            socket.setAttribute("width", 10);
+            socket.setAttribute("height", 12);
+            socket.setAttribute("fill", "black");
+
+            const bulb = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+            bulb.setAttribute("cx", 0);
+            bulb.setAttribute("cy", 0);
+            bulb.setAttribute("rx", 10);
+            bulb.setAttribute("ry", 18);
+            bulb.classList.add("bulb");
+
+            bulb.style.animationDelay = `${i * 0.4}s`;
+
+            group.appendChild(socket);
+            group.appendChild(bulb);
+
+            if (i === 0 || i === totalBulbs - 1) {
+                group.style.opacity = "0";
+            }
+
+            const invertRotation = direction === -1 ? 180 : 0;
+
+            group.setAttribute(
+                "transform",
+                `translate(${x},${y}) rotate(${angle * 180 / Math.PI + invertRotation})`
+            );
+
+            container.appendChild(group);
+        }
+    </script>
+
+</svg>
+
+</body>
+</html>
