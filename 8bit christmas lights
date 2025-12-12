@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>8-Bit Pixel Christmas Lights</title>
+<style>
+    body {
+        background: black;
+        display: flex;
+        justify-content: center;
+        padding-top: 40px;
+    }
+
+    svg {
+        image-rendering: pixelated;
+        shape-rendering: crispEdges;
+    }
+
+    .bulb {
+        animation: blink 1.2s steps(1) infinite;
+        filter: url(#pixelGlow);
+        shape-rendering: crispEdges;
+    }
+
+    @keyframes blink {
+        0%, 16%   { fill: #ff4444; }
+        17%, 33%  { fill: #4488ff; }
+        34%, 50%  { fill: #44ff44; }
+        51%, 67%  { fill: #ff4444; }
+        68%, 84%  { fill: #4488ff; }
+        85%, 100% { fill: #44ff44; }
+    }
+</style>
+</head>
+<body>
+
+<svg width="800" height="800" viewBox="0 0 800 800" overflow="visible">
+
+    <defs>
+        <filter id="pixelGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="b1" />
+            <feGaussianBlur stdDeviation="4" result="b2" />
+            <feMerge>
+                <feMergeNode in="b1"/>
+                <feMergeNode in="b2"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Centered square wire -->
+    <path id="wire"
+          d="
+          M200 200
+          L600 200
+          L600 600
+          L200 600
+          Z
+          "
+          stroke="#17302c"
+          stroke-width="10"
+          stroke-linecap="square"
+          stroke-linejoin="miter"
+          fill="none"
+          shape-rendering="crispEdges"
+    />
+
+    <!-- Container for bulbs -->
+    <g id="bulb-container"></g>
+
+    <script>
+        const wire = document.getElementById("wire");
+        const container = document.getElementById("bulb-container");
+
+        const totalBulbs = 30;
+        const offset = 25;
+        const leftLift = -25;
+
+        const length = wire.getTotalLength();
+
+        for (let i = 0; i < totalBulbs; i++) {
+            const p1 = wire.getPointAtLength((i / (totalBulbs - 1)) * length);
+            const p2 = wire.getPointAtLength((i / (totalBulbs - 1)) * length + 1);
+
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const hang = angle + Math.PI / 2;
+
+            const direction = i % 2 === 0 ? 1 : -1;
+
+            let x = p1.x + Math.cos(hang) * offset * direction;
+            let y = p1.y + Math.sin(hang) * offset * direction;
+
+            if (p1.x < 250 && p1.y > 200 && p1.y < 600) {
+                y += leftLift;
+            }
+
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+            const socket = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            socket.setAttribute("x", -6);
+            socket.setAttribute("y", -20);
+            socket.setAttribute("width", 12);
+            socket.setAttribute("height", 12);
+            socket.setAttribute("fill", "#2a4a49");
+            socket.setAttribute("shape-rendering", "crispEdges");
+
+            const bulb = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            bulb.setAttribute("x", -7);
+            bulb.setAttribute("y", -7);
+            bulb.setAttribute("width", 14);
+            bulb.setAttribute("height", 14);
+            bulb.classList.add("bulb");
+            bulb.setAttribute("shape-rendering", "crispEdges");
+
+            bulb.style.animationDelay = `${i * 0.15}s`;
+
+            group.appendChild(socket);
+            group.appendChild(bulb);
+
+            if (i === 0 || i === totalBulbs - 1) {
+                group.style.opacity = "0";
+            }
+
+            const invertRotation = direction === -1 ? 180 : 0;
+
+            group.setAttribute(
+                "transform",
+                `translate(${x},${y}) rotate(${angle * 180 / Math.PI + invertRotation})`
+            );
+
+            container.appendChild(group);
+        }
+    </script>
+
+</svg>
+
+</body>
+</html>
