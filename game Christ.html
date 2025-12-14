@@ -1,85 +1,296 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Simple First Person Scene</title>
-<style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-</style>
+    <meta charset="UTF-8">
+    <title>Christmas Maze 3D - Built on Your Base</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/PointerLockControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
 
 <script>
-// --- Scene ---
+/* -------------------------------------------------------
+   BASE CODE (your original system)
+------------------------------------------------------- */
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB); // blue sky
+scene.background = new THREE.Color(0x87CEEB);
 
-// --- Camera ---
-const camera = new THREE.PerspectiveCamera(
-    75, window.innerWidth / window.innerHeight, 0.1, 1000
-);
-camera.position.y = 2;
-
-// --- Renderer ---
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// --- Sun Light ---
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(50, 100, 50);
-scene.add(sun);
-scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+// Player container
+const cameraHolder = new THREE.Object3D();
+cameraHolder.add(camera);
+scene.add(cameraHolder);
 
-// --- Floor (100×100) ---
-const floorGeo = new THREE.PlaneGeometry(100, 100);
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x228B22 });
-const floor = new THREE.Mesh(floorGeo, floorMat);
-floor.rotation.x = -Math.PI / 2;
-scene.add(floor);
+// Starting point
+const START = { x: 2, y: 2, z: 2 };
+cameraHolder.position.set(START.x, START.y, START.z);
 
-// --- First Person Controls ---
-const controls = new THREE.PointerLockControls(camera, document.body);
+// Movement variables
+let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+let yaw = 0, pitch = 0;
+let isFlying = false;
+let gravity = 0.015;
+let jumpVelocity = 0, isJumping = false, isFalling = false;
 
-// click screen to lock pointer
-document.body.addEventListener('click', () => {
-    controls.lock();
+/* -------------------------------------------------------
+   INPUT
+------------------------------------------------------- */
+document.addEventListener('keydown', e => {
+    if (e.code === 'KeyW') moveForward = true;
+    if (e.code === 'KeyS') moveBackward = true;
+    if (e.code === 'KeyA') moveLeft = true;
+    if (e.code === 'KeyD') moveRight = true;
+    if (e.code === 'KeyF') isFlying = !isFlying;
+
+    if (e.code === 'Space' && !isFlying && !isJumping && !isFalling) {
+        isJumping = true;
+        jumpVelocity = 0.5;
+    }
 });
 
-// movement
-const keys = {};
-document.addEventListener('keydown', e => keys[e.key] = true);
-document.addEventListener('keyup', e => keys[e.key] = false);
+document.addEventListener('keyup', e => {
+    if (e.code === 'KeyW') moveForward = false;
+    if (e.code === 'KeyS') moveBackward = false;
+    if (e.code === 'KeyA') moveLeft = false;
+    if (e.code === 'KeyD') moveRight = false;
+});
 
-// --- Animation Loop ---
+// Mouse look
+document.addEventListener("mousemove", e => {
+    if (document.pointerLockElement !== document.body) return;
+    yaw -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+    cameraHolder.rotation.y = yaw;
+    camera.rotation.x = pitch;
+});
+
+document.body.addEventListener("click", () => {
+    document.body.requestPointerLock();
+});
+
+/* -------------------------------------------------------
+   MAZE GENERATION
+------------------------------------------------------- */
+const CELL = 3;
+const W = 21, H = 21;
+
+function generateMaze(w, h) {
+    let maze = Array.from({length: h}, () => Array(w).fill(1));
+
+    function carve(x, y) {
+        maze[y][x] = 0;
+        let dirs = [[2,0],[-2,0],[0,2],[0,-2]].sort(() => Math.random()-0.5);
+        for (let [dx,dy] of dirs) {
+            let nx = x+dx, ny = y+dy;
+            if (nx>0 && nx<w-1 && ny>0 && ny<h-1 && maze[ny][nx] === 1) {
+                maze[y+dy/2][x+dx/2] = 0;
+                carve(nx,ny);
+            }
+        }
+    }
+
+    carve(1,1);
+    return maze;
+}
+
+let maze = generateMaze(W,H);
+
+/* -------------------------------------------------------
+   MATERIALS
+------------------------------------------------------- */
+const wallMat = new THREE.MeshLambertMaterial({color:0x333333});
+const floorMat = new THREE.MeshLambertMaterial({color:0x006600});
+const bulbMat  = new THREE.MeshLambertMaterial({color:0xffff66, emissive:0xffff66});
+const enemyMat = new THREE.MeshLambertMaterial({color:0xdd0000});
+const portalMat = new THREE.MeshLambertMaterial({color:0x00ffee, emissive:0x00ffee});
+
+/* -------------------------------------------------------
+   LIGHTS
+------------------------------------------------------- */
+const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(50,100,50);
+scene.add(sun);
+
+/* -------------------------------------------------------
+   BUILD MAZE (floor + walls)
+------------------------------------------------------- */
+let walls = [];
+
+for (let y=0; y<H; y++) {
+    for (let x=0; x<W; x++) {
+
+        let wx = x * CELL;
+        let wz = y * CELL;
+
+        // floor
+        let f = new THREE.Mesh(new THREE.PlaneGeometry(CELL, CELL), floorMat);
+        f.rotation.x = -Math.PI/2;
+        f.position.set(wx, 0, wz);
+        scene.add(f);
+
+        // wall
+        if (maze[y][x] === 1) {
+            let w = new THREE.Mesh(new THREE.BoxGeometry(CELL, CELL*1.8, CELL), wallMat);
+            w.position.set(wx, CELL*0.9, wz);
+            scene.add(w);
+            walls.push(w);
+        }
+    }
+}
+
+/* -------------------------------------------------------
+   BULBS
+------------------------------------------------------- */
+let bulbs = [];
+let NUM_BULBS = 10;
+
+function spawnBulbs() {
+    while (bulbs.length < NUM_BULBS) {
+        let x = Math.floor(Math.random()*W);
+        let y = Math.floor(Math.random()*H);
+        if (maze[y][x] === 0) {
+            let b = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16), bulbMat);
+            b.position.set(x*CELL,1.2,y*CELL);
+            scene.add(b);
+            bulbs.push(b);
+        }
+    }
+}
+spawnBulbs();
+
+/* -------------------------------------------------------
+   ENEMIES
+------------------------------------------------------- */
+let enemies = [];
+let NUM_ENEMIES = 4;
+
+function spawnEnemies() {
+    while (enemies.length < NUM_ENEMIES) {
+        let x = Math.floor(Math.random()*W);
+        let y = Math.floor(Math.random()*H);
+        if (maze[y][x] === 0) {
+            let e = new THREE.Mesh(new THREE.BoxGeometry(1,1.8,1), enemyMat);
+            e.position.set(x*CELL,0.9,y*CELL);
+            scene.add(e);
+            enemies.push(e);
+        }
+    }
+}
+spawnEnemies();
+
+/* -------------------------------------------------------
+   PORTAL
+------------------------------------------------------- */
+let portal = new THREE.Mesh(new THREE.TorusGeometry(1.4,0.5,16,30), portalMat);
+portal.position.set((W-2)*CELL, 1.4, (H-2)*CELL);
+portal.visible = false;
+scene.add(portal);
+
+/* -------------------------------------------------------
+   COLLISION
+------------------------------------------------------- */
+function canMoveTo(x,z) {
+    for (let w of walls) {
+        if (Math.abs(w.position.x - x) < CELL*0.6 &&
+            Math.abs(w.position.z - z) < CELL*0.6) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* -------------------------------------------------------
+   GAME LOOP
+------------------------------------------------------- */
+let collected = 0;
+
 function animate() {
     requestAnimationFrame(animate);
 
-    // speed
-    const speed = 0.1;
+    /* ----- Movement ----- */
+    const speed = isFlying ? 0.2 : 0.1;
+    let newPos = cameraHolder.position.clone();
 
-    // WASD movement
-    if (keys['w']) controls.moveForward(speed);
-    if (keys['s']) controls.moveForward(-speed);
-    if (keys['a']) controls.moveRight(-speed);
-    if (keys['d']) controls.moveRight(speed);
+    if (moveForward) {
+        newPos.x -= Math.sin(yaw) * speed;
+        newPos.z -= Math.cos(yaw) * speed;
+    }
+    if (moveBackward) {
+        newPos.x += Math.sin(yaw) * speed;
+        newPos.z += Math.cos(yaw) * speed;
+    }
+    if (moveLeft) {
+        newPos.x -= Math.cos(yaw) * speed;
+        newPos.z += Math.sin(yaw) * speed;
+    }
+    if (moveRight) {
+        newPos.x += Math.cos(yaw) * speed;
+        newPos.z -= Math.sin(yaw) * speed;
+    }
+
+    if (canMoveTo(newPos.x, newPos.z)) {
+        cameraHolder.position.x = newPos.x;
+        cameraHolder.position.z = newPos.z;
+    }
+
+    /* ----- Gravity ----- */
+    if (!isFlying) {
+        if (isJumping || isFalling) {
+            cameraHolder.position.y += jumpVelocity;
+            jumpVelocity -= gravity;
+        }
+
+        if (cameraHolder.position.y <= 2) {
+            cameraHolder.position.y = 2;
+            isJumping = false;
+            isFalling = false;
+        } else {
+            isFalling = true;
+        }
+    }
+
+    /* ----- Bulb collection ----- */
+    for (let i=bulbs.length-1; i>=0; i--) {
+        if (cameraHolder.position.distanceTo(bulbs[i].position) < 1.5) {
+            scene.remove(bulbs[i]);
+            bulbs.splice(i,1);
+            collected++;
+            if (collected === NUM_BULBS) portal.visible = true;
+        }
+    }
+
+    /* ----- Enemies chase player ----- */
+    enemies.forEach(e => {
+        let dir = new THREE.Vector3().subVectors(cameraHolder.position, e.position).normalize();
+        e.position.addScaledVector(dir, 0.03);
+        if (cameraHolder.position.distanceTo(e.position) < 1) {
+            location.reload();
+        }
+    });
+
+    /* ----- Portal Win ----- */
+    if (portal.visible && cameraHolder.position.distanceTo(portal.position) < 2) {
+        alert("🎄 You escaped the Christmas Maze! 🎄");
+        location.reload();
+    }
 
     renderer.render(scene, camera);
 }
 
 animate();
 
-// --- Resize ---
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
 </script>
-
 </body>
 </html>
