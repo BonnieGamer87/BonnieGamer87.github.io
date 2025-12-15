@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Christmas Maze 3D - Festive & Collidable Tree with Portal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: sans-serif;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px #000000;
+        }
+        #fps {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-family: sans-serif;
+            font-size: 18px;
+            text-shadow: 1px 1px 2px #000000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="overlay">Bulbs Collected: 0 / 10 (Press F to Toggle Fly Mode, Q/E for Vertical Flight, SHIFT to Run)</div>
+<div id="fps">FPS: 0</div>
+
+
+<script>
+/* -------------------------------------------------------
+    CONSTANTS AND INITIAL SETUP
+------------------------------------------------------- */
+const CELL = 4.5;
+const W = 31, H = 31;
+const PLAYER_HEIGHT = 2;
+const NUM_BULBS = 10;
+const NUM_ENEMIES = 4;
+// Removed MIN_BULB_DISTANCE_CELLS and MAX_PLACEMENT_ATTEMPTS
+let mazeSeed = Date.now();
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const cameraHolder = new THREE.Object3D();
+cameraHolder.add(camera);
+scene.add(cameraHolder);
+
+let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+let moveUp = false; 
+let moveDown = false; 
+let isRunning = false; 
+
+let yaw = 0, pitch = 0;
+let isFlying = false; 
+let gravity = 0.015;
+let jumpVelocity = 0, isJumping = false, isFalling = false;
+
+let walls = [];
+let bulbs = []; 
+let enemies = [];
+let collected = 0;
+let portal;
+let treeLights = []; 
+let christmasTree;
+let portalCubeCenter; 
+
+// FPS Counter variables
+let lastTime = 0;
+let frameCount = 0;
+let fps = 0;
+
+// Define the three specific RGB colors for the decorative lights
+const RGB_COLORS = [
+    new THREE.Color(0xFF0000), 
+    new THREE.Color(0x00FF00), 
+    new THREE.Color(0x0000FF)  
+];
+
+const TRUNK_VISIBLE_HEIGHT = 1.5; 
+const TRUNK_RADIUS = 0.8; 
+const CONE_HEIGHT = CELL * 3; 
+const CONE_BASE_RADIUS = CELL * 1.0; 
+const WALL_WIDTH = CELL; 
+const WALL_HEIGHT = CELL * 2.5; 
+
+/* -------------------------------------------------------
+    UTILITY FUNCTIONS
+------------------------------------------------------- */
+function seededRandom(max, min = 0) {
+    mazeSeed = (mazeSeed * 9301 + 49297) % 233280;
+    let rnd = mazeSeed / 233280;
+    return Math.floor(min + rnd * (max - min));
+}
+
+function updateFPS(time) {
+    frameCount++;
+    const delta = time - lastTime;
+    if (delta >= 1000) {
+        fps = Math.round(frameCount / (delta / 1000));
+        document.getElementById('fps').textContent = `FPS: ${fps}`;
+        lastTime = time;
+        frameCount = 0;
+    }
+}
+
+function disposeMeshes(object) {
+    if (object.geometry) object.geometry.dispose();
+    if (object.material) {
+        if (Array.isArray(object.material)) {
+            object.material.forEach(m => m.dispose());
+        } else {
+            object.material.dispose();
+        }
+    }
+}
+
+function resetLevel(newSeed = Date.now()) {
+    const objectsToKeep = [cameraHolder];
+    scene.children.filter(c => c.isLight).forEach(light => objectsToKeep.push(light));
+    
+    for(let i = scene.children.length - 1; i >= 0; i--) {
+        let obj = scene.children[i];
+        if (!objectsToKeep.includes(obj)) {
+            scene.remove(obj); 
+            if (obj.isGroup) {
+                obj.children.forEach(disposeMeshes);
+            }
+            disposeMeshes(obj);
+        }
+    }
+    
+    walls.length = 0;
+    bulbs.length = 0;
+    enemies.length = 0;
+    treeLights.length = 0; 
+    collected = 0;
+    document.getElementById('overlay').textContent = `Bulbs Collected: ${collected} / ${NUM_BULBS} (Press F to Toggle Fly Mode, Q/E for Vertical Flight, SHIFT to Run)`;
+    
+    mazeSeed = newSeed;
+    enemyPaths.clear(); 
+    
+    setTimeout(initGame, 0); 
+}
+
+function generateMaze(w, h) {
+    let maze = Array.from({length: h}, () => Array(w).fill(1));
+    function carve(x, y) {
+        maze[y][x] = 0;
+        let dirs = [[2,0],[-2,0],[0,2],[0,-2]].sort(() => Math.random()-0.5);
+        for (let [dx,dy] of dirs) {
+            let nx = x+dx, ny = y+dy;
+            if (nx>0 && nx<w-1 && ny>0 && ny<h-1 && maze[ny][nx] === 1) {
+                maze[y+dy/2][x+dx/2] = 0;
+                carve(nx,ny);
+            }
+        }
+    }
+    carve(1,1);
+    const centerSize = 7;
+    const centerStart = Math.floor((w - centerSize) / 2);
+    for (let y = 0; y < centerSize; y++) {
+        for (let x = 0; x < centerSize; x++) {
+            let cx = centerStart + x;
+            let cy = centerStart + y;
+            if (cx > 0 && cx < w - 1 && cy > 0 && cy < h - 1) {
+                maze[cy][cx] = 0; 
+            }
+        }
+    }
+    return maze;
+}
+
+let currentMaze = generateMaze(W,H);
+
+/* -------------------------------------------------------
+    MATERIALS (Festive Colors)
+------------------------------------------------------- */
+const wallMat = new THREE.MeshLambertMaterial({color: 0xeaeade});
+const floorMat = new THREE.MeshLambertMaterial({color: 0x007f00});
+const baseBulbMat = new THREE.MeshLambertMaterial({emissive: 0x000000}); 
+const enemyMat = new THREE.MeshLambertMaterial({color:0xdd0000});
+const portalMat = new THREE.MeshLambertMaterial({color:0x00ff00, emissive:0x00ff00, side: THREE.DoubleSide, transparent: true, opacity: 0.8});
+const wireMat = new THREE.LineBasicMaterial({color: 0x888888, linewidth: 3});
+const treeMat = new THREE.MeshLambertMaterial({color: 0x003f00});
+const unlitTreeLightMat = new THREE.MeshLambertMaterial({
+    color: 0x333333, 
+    emissive: 0x000000
+});
+
+/* -------------------------------------------------------
+    LIGHTS
+------------------------------------------------------- */
+if (scene.children.filter(c => c.isLight).length === 0) {
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(50,100,50);
+    scene.add(sun);
+}
+
+/* -------------------------------------------------------
+    BUILD MAZE & TREE
+------------------------------------------------------- */
+function createChristmasTree() {
+    
+    const centerSize = 7;
+    const centerMiddle = Math.floor((W - centerSize) / 2) + Math.floor(centerSize / 2);
+    const treeWorldX = centerMiddle * CELL;
+    const treeWorldZ = centerMiddle * CELL;
+    portalCubeCenter = new THREE.Vector3(treeWorldX, 0, treeWorldZ);
+
+    const trunkHeight = TRUNK_VISIBLE_HEIGHT;
+    const trunkGeo = new THREE.CylinderGeometry(TRUNK_RADIUS, TRUNK_RADIUS, trunkHeight, 16); 
+    const trunkMat = new THREE.MeshLambertMaterial({color: 0x582900});
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(treeWorldX, trunkHeight / 2, treeWorldZ);
+
+    const coneStartHeight = trunkHeight; 
+    const coneTotalHeight = CONE_HEIGHT; 
+    const treeBaseRadius = CONE_BASE_RADIUS; 
+    const coneGeo = new THREE.ConeGeometry(treeBaseRadius, coneTotalHeight, 32);
+    const cone = new THREE.Mesh(coneGeo, treeMat);
+    cone.position.set(treeWorldX, coneStartHeight + coneTotalHeight / 2, treeWorldZ);
+    
+    christmasTree = new THREE.Group();
+    christmasTree.add(cone);
+    christmasTree.add(trunk);
+    christmasTree.isCollidable = true; 
+    christmasTree.collisionRadius = CONE_BASE_RADIUS * 0.9;
+    scene.add(christmasTree);
+}
+
+function buildMaze(maze) {
+    const floorGeo = new THREE.PlaneGeometry(CELL, CELL);
+    const wallGeo = new THREE.BoxGeometry(WALL_WIDTH, WALL_HEIGHT, WALL_WIDTH);
+    
+    for (let y=0; y<H; y++) {
+        for (let x=0; x<W; x++) {
+
+            let wx = x * CELL;
+            let wz = y * CELL;
+
+            // Floor
+            let f = new THREE.Mesh(floorGeo, floorMat);
+            f.rotation.x = -Math.PI/2;
+            f.position.set(wx, 0, wz);
+            scene.add(f);
+
+            // Wall check
+            if (maze[y][x] === 1) {
+                let w = new THREE.Mesh(wallGeo, wallMat);
+                w.position.set(wx, WALL_HEIGHT / 2, wz); 
+                w.isCollidable = true;
+                w.collisionSizeX = WALL_WIDTH / 2;
+                w.collisionSizeZ = WALL_WIDTH / 2;
+                scene.add(w);
+                walls.push(w);
+            }
+        }
+    }
+    
+    createChristmasTree(); 
+}
+
+function decorateChristmasTree() {
+    if (!christmasTree) return;
+
+    const cone = christmasTree.children.find(c => c.geometry.type === 'ConeGeometry');
+    if (!cone) return;
+
+    const coneTotalHeight = cone.geometry.parameters.height;
+    const treeBaseRadius = cone.geometry.parameters.radius; 
+    const treePos = cone.position; 
+
+    const totalLights = NUM_BULBS; 
+    const numTurns = 7; 
+    const lightGeo = new THREE.SphereGeometry(0.1, 8, 8); 
+
+    let spiralPoints = []; 
+
+    const detail = 50; 
+    const numWireSegments = detail * numTurns; 
+    const CONE_BOTTOM_Y = cone.position.y - (coneTotalHeight / 2); 
+
+    for (let i = 0; i <= numWireSegments; i++) {
+        const heightRatio = i / numWireSegments;
+        const angle = heightRatio * Math.PI * 2 * numTurns; 
+
+        const y = CONE_BOTTOM_Y + heightRatio * coneTotalHeight; 
+        const radiusRatio = (1 - heightRatio);
+        const currentRadius = treeBaseRadius * radiusRatio * 1.05; 
+
+        const x = treePos.x + currentRadius * Math.cos(angle);
+        const z = treePos.z + currentRadius * Math.sin(angle);
+
+        spiralPoints.push(new THREE.Vector3(x, y, z));
+    }
+
+    const curve = new THREE.CatmullRomCurve3(spiralPoints);
+    const wireGeometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(numWireSegments * 3));
+    const line = new THREE.Line(wireGeometry, wireMat);
+    scene.add(line);
+    
+    for (let i = 0; i < totalLights; i++) {
+        const t = i / totalLights; 
+        const lightPos = curve.getPointAt(t);
+
+        const individualLightMat = unlitTreeLightMat.clone();
+        
+        const bulb = new THREE.Mesh(lightGeo, individualLightMat);
+        bulb.position.copy(lightPos);
+        scene.add(bulb);
+        treeLights.push(bulb); 
+    }
+}
+
+function spawnBulbs(maze) {
+    const bulbGeo = new THREE.SphereGeometry(0.5,16,16);
+    const centerSize = 7;
+    const centerStart = Math.floor((W - centerSize) / 2); 
+    const centerEnd = centerStart + centerSize - 1; 
+
+    while (bulbs.length < NUM_BULBS) {
+        let x = seededRandom(W);
+        let y = seededRandom(H);
+        
+        const isInCenter = (x >= centerStart && x <= centerEnd && y >= centerStart && y <= centerEnd);
+        
+        // --- ONLY CHECKS REMAINING: 1. Maze floor cell, 2. Start cell, 3. Center/Tree area ---
+        if (maze[y][x] === 0 && (x !== 1 || y !== 1) && !isInCenter) { 
+            
+            const colorIndex = seededRandom(RGB_COLORS.length);
+            const rgbColor = RGB_COLORS[colorIndex];
+
+            const bulbMat = baseBulbMat.clone();
+            bulbMat.color.copy(rgbColor);
+            bulbMat.emissive.copy(rgbColor).multiplyScalar(0.7);
+
+            let b = new THREE.Mesh(bulbGeo, bulbMat);
+            b.position.set(x*CELL, 1.2, y*CELL);
+            scene.add(b);
+            bulbs.push(b);
+        }
+    }
+}
+
+function spawnEnemies(maze) {
+    const enemyGeo = new THREE.BoxGeometry(1, 1.8, 1);
+    while (enemies.length < NUM_ENEMIES) {
+        let x = seededRandom(W);
+        let y = seededRandom(H);
+        if (maze[y][x] === 0 && (x !== 1 || y !== 1)) {
+            let e = new THREE.Mesh(enemyGeo, enemyMat);
+            e.position.set(x*CELL, 0.9, y*CELL);
+            scene.add(e);
+            enemies.push(e);
+        }
+    }
+}
+
+function createPortal() {
+    const portalWidth = 3;
+    const portalHeight = 5;
+    
+    const cubeSide = CONE_BASE_RADIUS * 1.5 + 1.0; 
+
+    portal = new THREE.Mesh(new THREE.PlaneGeometry(portalWidth, portalHeight), portalMat); 
+    portal.position.y = portalHeight / 2 + 0.05; 
+    portal.visible = false;
+
+    const side = seededRandom(4);
+
+    let offsetX = 0, offsetZ = 0, rotationY = 0;
+    
+    switch (side) {
+        case 0: // North side (+Z)
+            offsetZ = cubeSide / 2 + portalWidth / 2; 
+            rotationY = 0; 
+            break;
+        case 1: // East side (+X)
+            offsetX = cubeSide / 2 + portalWidth / 2;
+            rotationY = Math.PI / 2; 
+            break;
+        case 2: // South side (-Z)
+            offsetZ = -(cubeSide / 2 + portalWidth / 2);
+            rotationY = Math.PI; 
+            break;
+        case 3: // West side (-X)
+            offsetX = -(cubeSide / 2 + portalWidth / 2);
+            rotationY = -Math.PI / 2; 
+            break;
+    }
+
+    portal.position.x = portalCubeCenter.x + offsetX;
+    portal.position.z = portalCubeCenter.z + offsetZ;
+    portal.rotation.y = rotationY; 
+
+    scene.add(portal);
+}
+
+function initGame() {
+    currentMaze = generateMaze(W,H);
+    buildMaze(currentMaze);
+    decorateChristmasTree(); 
+    spawnBulbs(currentMaze); 
+    spawnEnemies(currentMaze);
+    createPortal();
+    
+    cameraHolder.position.set(CELL, PLAYER_HEIGHT, CELL);
+    cameraHolder.rotation.y = 0;
+    camera.rotation.x = 0;
+    yaw = 0;
+    pitch = 0;
+}
+
+initGame();
+
+
+/* -------------------------------------------------------
+    INPUT & COLLISION
+------------------------------------------------------- */
+document.addEventListener('keydown', e => {
+    if (e.code === 'KeyW') moveForward = true;
+    if (e.code === 'KeyS') moveBackward = true;
+    if (e.code === 'KeyA') moveLeft = true;
+    if (e.code === 'KeyD') moveRight = true;
+    if (e.code === 'KeyQ') moveUp = true;
+    if (e.code === 'KeyE') moveDown = true;
+    
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        isRunning = true;
+    }
+
+    if (e.code === 'KeyF') {
+          isFlying = !isFlying;
+          if (!isFlying) {
+            cameraHolder.position.y = PLAYER_HEIGHT;
+            isJumping = false;
+            isFalling = false;
+          }
+    }
+
+    if (e.code === 'Space' && !isFlying && !isJumping && !isFalling) {
+        isJumping = true;
+        jumpVelocity = 0.5;
+    }
+});
+
+document.addEventListener('keyup', e => {
+    if (e.code === 'KeyW') moveForward = false;
+    if (e.code === 'KeyS') moveBackward = false;
+    if (e.code === 'KeyA') moveLeft = false;
+    if (e.code === 'KeyD') moveRight = false;
+    if (e.code === 'KeyQ') moveUp = false;
+    if (e.code === 'KeyE') moveDown = false;
+    
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        isRunning = false;
+    }
+});
+
+document.addEventListener("mousemove", e => {
+    if (document.pointerLockElement !== document.body) return;
+    yaw -= e.movementX * 0.002;
+    pitch -= e.movementY * 0.002;
+    pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+    cameraHolder.rotation.y = yaw;
+    camera.rotation.x = pitch;
+});
+
+document.body.addEventListener("click", () => {
+    document.body.requestPointerLock();
+});
+
+function checkTreeCollision(x, z, radius) {
+    if (!christmasTree || !christmasTree.isCollidable) return false;
+    const treeCenter = new THREE.Vector3(christmasTree.position.x, 0, christmasTree.position.z);
+    const playerCenter = new THREE.Vector3(x, 0, z);
+    const distance = treeCenter.distanceTo(playerCenter);
+    return distance < (christmasTree.collisionRadius + radius);
+}
+
+function canMoveTo(x, z, radius = 0.5) {
+    if (isFlying) return true; 
+    for (let w of walls) {
+        if (Math.abs(w.position.x - x) < w.collisionSizeX + radius &&
+            Math.abs(w.position.z - z) < w.collisionSizeZ + radius) {
+            return false;
+        }
+    }
+    if (checkTreeCollision(x, z, radius)) {
+        return false;
+    }
+    return true;
+}
+
+function worldToMaze(pos) {
+    return {
+        x: Math.round(pos.x / CELL),
+        y: Math.round(pos.z / CELL)
+    };
+}
+
+function findPath(start, end, maze) {
+    let queue = [{ pos: start, path: [] }];
+    let visited = Array.from({length: H}, () => Array(W).fill(false));
+
+    while (queue.length > 0) {
+        let { pos, path } = queue.shift();
+        
+        if (pos.x === end.x && pos.y === end.y) {
+            return path;
+        }
+
+        if (pos.x < 0 || pos.x >= W || pos.y < 0 || pos.y >= H || visited[pos.y][pos.x] || maze[pos.y][pos.x] === 1) {
+            continue;
+        }
+        visited[pos.y][pos.x] = true;
+
+        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        for (let [dx, dy] of directions) {
+            let nextPos = { x: pos.x + dx, y: pos.y + dy };
+            let newPath = [...path, nextPos];
+            queue.push({ pos: nextPos, path: newPath });
+        }
+    }
+    return null;
+}
+
+let enemyPaths = new Map();
+
+/* -------------------------------------------------------
+    GAME LOOP
+------------------------------------------------------- */
+function animate(time) {
+    requestAnimationFrame(animate); 
+
+    updateFPS(time);
+
+    let baseSpeed = 0.1;
+    const speedMultiplier = isRunning ? 2.5 : 1.0; 
+    const speed = isFlying ? 0.3 : (baseSpeed * speedMultiplier);
+    
+    let newPos = cameraHolder.position.clone();
+
+    /* ----- Player Movement ----- */
+    let deltaX = 0, deltaZ = 0;
+    if (moveForward) {
+        deltaX -= Math.sin(yaw) * speed;
+        deltaZ -= Math.cos(yaw) * speed;
+    }
+    if (moveBackward) {
+        deltaX += Math.sin(yaw) * speed;
+        deltaZ += Math.cos(yaw) * speed;
+    }
+    if (moveLeft) {
+        deltaX -= Math.cos(yaw) * speed;
+        deltaZ += Math.sin(yaw) * speed;
+    }
+    if (moveRight) {
+        deltaX += Math.cos(yaw) * speed;
+        deltaZ -= Math.sin(yaw) * speed;
+    }
+
+    newPos.x += deltaX;
+    newPos.z += deltaZ;
+    
+    // Collision check
+    if (canMoveTo(newPos.x, cameraHolder.position.z)) {
+        cameraHolder.position.x = newPos.x;
+    } 
+    if (canMoveTo(cameraHolder.position.x, newPos.z)) {
+        cameraHolder.position.z = newPos.z;
+    }
+    
+    // Vertical movement/gravity... 
+    if (isFlying) {
+        if (moveUp) {
+            cameraHolder.position.y += speed;
+        }
+        if (moveDown) {
+            cameraHolder.position.y = Math.max(0.1, cameraHolder.position.y - speed); 
+        }
+    } else {
+        if (isJumping || isFalling) {
+            cameraHolder.position.y += jumpVelocity;
+            jumpVelocity -= gravity;
+        }
+        if (cameraHolder.position.y <= PLAYER_HEIGHT) {
+            cameraHolder.position.y = PLAYER_HEIGHT;
+            isJumping = false;
+            isFalling = false;
+        } else {
+            isFalling = true;
+        }
+    }
+
+
+    /* ----- Bulb collection, Enemies, Portal checks ----- */
+    for (let i=bulbs.length-1; i>=0; i--) {
+        if (cameraHolder.position.distanceTo(bulbs[i].position) < 1.5) {
+            scene.remove(bulbs[i]);
+            bulbs.splice(i,1);
+            collected++;
+            document.getElementById('overlay').textContent = `Bulbs Collected: ${collected} / ${NUM_BULBS} (Press F to Toggle Fly Mode, Q/E for Vertical Flight, SHIFT to Run)`;
+            
+            if (collected > 0 && collected <= treeLights.length) {
+                const lightIndex = collected - 1; 
+                const treeLight = treeLights[lightIndex];
+                const colorIndex = seededRandom(RGB_COLORS.length);
+                const rgbColor = RGB_COLORS[colorIndex];
+                treeLight.material.color.copy(rgbColor);
+                treeLight.material.emissive.copy(rgbColor).multiplyScalar(0.7);
+            }
+            if (collected === NUM_BULBS) portal.visible = true;
+        }
+    }
+
+    enemies.forEach(e => {
+        const enemySpeed = 0.05;
+        let startCell = worldToMaze(e.position);
+        let targetCell = worldToMaze(cameraHolder.position);
+        let currentPath = enemyPaths.get(e);
+        if (!currentPath || currentPath.length === 0) {
+             currentPath = findPath(startCell, targetCell, currentMaze);
+             enemyPaths.set(e, currentPath || []);
+        }
+        if (currentPath && currentPath.length > 0) {
+            let nextCell = currentPath[0];
+            let targetWorldX = nextCell.x * CELL;
+            let targetWorldZ = nextCell.y * CELL;
+            let dir = new THREE.Vector3(targetWorldX, e.position.y, targetWorldZ).sub(e.position).normalize();
+            e.position.addScaledVector(dir, enemySpeed);
+            if (e.position.distanceTo(new THREE.Vector3(targetWorldX, e.position.y, targetWorldZ)) < enemySpeed * 2) {
+                currentPath.shift();
+                enemyPaths.set(e, currentPath);
+            }
+        }
+        if (cameraHolder.position.distanceTo(e.position) < 1) {
+            resetLevel();
+            return;
+        }
+    });
+
+    if (portal.visible) {
+        if (cameraHolder.position.distanceTo(portal.position) < 2) {
+            resetLevel(); 
+        }
+    }
+
+    renderer.render(scene, camera);
+}
+
+animate(0); 
+
+</script>
+</body>
+</html>
