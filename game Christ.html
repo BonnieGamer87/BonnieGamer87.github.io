@@ -2,11 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Christmas Maze 3D - Festive & Collidable Tree with Portal</title>
+    <title>Christmas Maze 3D - Progressive Levels</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
+        /* --- FIX: Ensure HTML and Body take up the whole screen without margins --- */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        
+        /* --- Ensure the canvas fills the entire viewport --- */
+        canvas { 
+            display: block;
+            width: 100%; 
+            height: 100%;
+        }
+        
+        /* --- Overlay Text Positioning --- */
         #overlay {
             position: absolute;
             top: 10px;
@@ -15,6 +30,8 @@
             font-family: sans-serif;
             font-size: 24px;
             text-shadow: 2px 2px 4px #000000;
+            z-index: 10;
+            pointer-events: none;
         }
         #fps {
             position: absolute;
@@ -24,28 +41,112 @@
             font-family: sans-serif;
             font-size: 18px;
             text-shadow: 1px 1px 2px #000000;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* --- Brightness Slider Container --- */
+        #brightness-control {
+            position: absolute;
+            top: 40px; /* Below FPS counter */
+            right: 10px;
+            z-index: 10;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            color: white;
+            font-family: sans-serif;
+            font-size: 14px;
+        }
+        #brightness-control label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        /* --- NEW: Level Selector Menu Styling --- */
+        #level-selector {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid #c90000;
+            border-radius: 10px;
+            color: white;
+            font-family: sans-serif;
+            text-align: center;
+            display: none; /* Hidden by default */
+        }
+        #level-selector button {
+            display: block;
+            width: 150px;
+            padding: 10px;
+            margin: 10px auto;
+            background-color: #007f00;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        #level-selector button:hover {
+            background-color: #009900;
         }
     </style>
 </head>
 <body>
 
-<div id="overlay">Bulbs Collected: 0 / 10 (Press F to Toggle Fly Mode, Q/E for Vertical Flight)</div>
+<div id="overlay">Level 1 | Bulbs Collected: 0 / 10 (Press SHIFT to Run, F to Toggle Fly Mode, Q/E for Vertical Flight)</div>
 <div id="fps">FPS: 0</div>
 
-
+<div id="brightness-control">
+    <label for="ambient-slider">Ambient Brightness: <span id="brightness-percent">60%</span></label>
+    <input type="range" id="ambient-slider" min="0.01" max="1.0" step="0.01" value="0.6">
+</div>
+<div id="level-selector">
+    <h2>Select Level (1 - 5)</h2>
+    <div id="level-buttons">
+        </div>
+    <p style="font-size: 12px; margin-top: 20px;">Press P to resume game.</p>
+</div>
 <script>
 /* -------------------------------------------------------
     CONSTANTS AND INITIAL SETUP
 ------------------------------------------------------- */
 const CELL = 4.5;
-const W = 31, H = 31;
+// Base Maze Dimensions (must be odd numbers)
+const BASE_W = 31; 
+const BASE_H = 31;
+
+let W, H; // Current Maze Dimensions
+let NUM_BULBS; // Current required bulbs
 const PLAYER_HEIGHT = 2;
-const NUM_BULBS = 10;
 const NUM_ENEMIES = 4;
 let mazeSeed = Date.now();
+let originalLevelSeed = mazeSeed;
+let currentLevel = 1; // Start at Level 1
+
+// NEW: Pause state
+let isPaused = false; 
+let animationFrameId = null;
+
+// Level progression data
+const LEVEL_SETTINGS = [
+    { level: 1, sizeMultiplier: 1, bulbCount: 10, ambientIntensity: 0.6 },
+    { level: 2, sizeMultiplier: 1.25, bulbCount: 20, ambientIntensity: 0.4 },
+    { level: 3, sizeMultiplier: 1.5, bulbCount: 30, ambientIntensity: 0.25 },
+    { level: 4, sizeMultiplier: 1.75, bulbCount: 40, ambientIntensity: 0.15 },
+    { level: 5, sizeMultiplier: 2.0, bulbCount: 50, ambientIntensity: 0.05 },
+];
+const MAX_LEVEL = LEVEL_SETTINGS.length;
+let currentSettings = LEVEL_SETTINGS[0];
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
+// Set initial background color to match the initial slider value (daylight blue)
+scene.background = new THREE.Color(0x87CEEB); 
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
 const renderer = new THREE.WebGLRenderer();
@@ -59,6 +160,7 @@ scene.add(cameraHolder);
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let moveUp = false; 
 let moveDown = false; 
+let isRunning = false; 
 
 let yaw = 0, pitch = 0;
 let isFlying = false; 
@@ -70,7 +172,7 @@ let bulbs = []; // Collectible bulbs
 let enemies = [];
 let collected = 0;
 let portal;
-let treeLights = []; // Decorative tree lights (10 total)
+let treeLights = []; // Decorative tree lights (max 50)
 let christmasTree;
 let portalCubeCenter; // The invisible cube's center
 
@@ -95,6 +197,20 @@ const CONE_BASE_RADIUS = CELL * 1.0;
 // WALL DIMENSIONS (Reverted to thick blocks)
 const WALL_WIDTH = CELL; 
 const WALL_HEIGHT = CELL * 2.5; 
+
+/* -------------------------------------------------------
+    LIGHTING SETUP
+------------------------------------------------------- */
+// Ambient and Sun lights
+const ambient = new THREE.AmbientLight(0xffffff, currentSettings.ambientIntensity); // Initial Intensity
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(50,100,50);
+scene.add(sun);
+
+// Initialize slider
+document.getElementById('ambient-slider').value = currentSettings.ambientIntensity;
 
 /* -------------------------------------------------------
     UTILITY FUNCTIONS
@@ -127,11 +243,42 @@ function disposeMeshes(object) {
     }
 }
 
-function resetLevel(newSeed = Date.now()) {
-    // Clear all existing meshes and dispose of resources
-    const objectsToKeep = [cameraHolder, scene.children.find(c => c.isLight)];
+function resetLevel(newLevel = currentLevel, nextLevel = false) {
+    let newSeed = Date.now();
     
-    // Reverse loop to safely remove elements while disposing
+    // Determine the level setting
+    if (nextLevel && newLevel < MAX_LEVEL) {
+        currentLevel = newLevel + 1;
+        originalLevelSeed = newSeed; 
+    } else if (nextLevel && newLevel === MAX_LEVEL) {
+        alert("CONGRATULATIONS! You completed the final level!");
+        currentLevel = 1; // Loop back to level 1 for replayability
+        originalLevelSeed = newSeed; 
+    } else if (newLevel !== currentLevel) {
+        // Direct level selection (e.g., from the selector menu)
+        currentLevel = newLevel;
+        originalLevelSeed = newSeed; 
+    } else if (!nextLevel) {
+        // Death restart or simple reset, keep original seed
+        newSeed = originalLevelSeed; 
+    }
+
+    currentSettings = LEVEL_SETTINGS.find(s => s.level === currentLevel);
+    
+    // Update global variables
+    W = Math.max(3, Math.floor(BASE_W * currentSettings.sizeMultiplier / 2) * 2 + 1);
+    H = Math.max(3, Math.floor(BASE_H * currentSettings.sizeMultiplier / 2) * 2 + 1);
+    NUM_BULBS = currentSettings.bulbCount;
+    
+    // Set ambient light and percentage display
+    const initialIntensity = parseFloat(document.getElementById('ambient-slider').value);
+    ambient.intensity = initialIntensity; 
+    document.getElementById('brightness-percent').textContent = `${Math.round(initialIntensity * 100)}%`; 
+    
+    document.getElementById('overlay').textContent = `Level ${currentLevel} | Bulbs Collected: 0 / ${NUM_BULBS} (Press SHIFT to Run, F to Toggle Fly Mode, Q/E for Vertical Flight)`;
+
+    // Clear and dispose resources
+    const objectsToKeep = [cameraHolder, ambient, sun];
     for(let i = scene.children.length - 1; i >= 0; i--) {
         let obj = scene.children[i];
         if (!objectsToKeep.includes(obj)) {
@@ -149,14 +296,15 @@ function resetLevel(newSeed = Date.now()) {
     enemies.length = 0;
     treeLights.length = 0; 
     collected = 0;
-    document.getElementById('overlay').textContent = `Bulbs Collected: ${collected} / ${NUM_BULBS} (Press F to Toggle Fly Mode, Q/E for Vertical Flight)`;
     
     mazeSeed = newSeed;
-    
-    // Reset enemy pathfinding map
     enemyPaths.clear(); 
     
-    // Re-initialize the game on the next animation frame
+    // Restart animation loop if it was paused
+    if (isPaused) {
+        togglePause();
+    }
+
     setTimeout(initGame, 0); 
 }
 
@@ -189,17 +337,40 @@ function generateMaze(w, h) {
             }
         }
     }
+    
+    // Level 4+ Maze Trapping
+    if (currentLevel >= 4) {
+        const trapChance = currentLevel * 0.005; // 4: 2%, 5: 2.5% chance per walkable cell
+        const playerStartX = 1;
+        const playerStartY = 1;
+        
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                if (maze[y][x] === 0 && (x !== playerStartX || y !== playerStartY) &&
+                    (x % 2 !== 0 || y % 2 !== 0)) {
+                    
+                    if (Math.random() < trapChance) {
+                        maze[y][x] = 1; 
+                        
+                        // Increase the trapping effect
+                        if (x % 2 === 1 && y % 2 === 0 && x + 1 < w - 1) maze[y][x+1] = 1; 
+                        if (x % 2 === 0 && y % 2 === 1 && y + 1 < h - 1) maze[y+1][x] = 1; 
+                    }
+                }
+            }
+        }
+    }
+    
     return maze;
 }
 
-let currentMaze = generateMaze(W,H);
+let currentMaze;
 
 /* -------------------------------------------------------
     MATERIALS (Festive Colors)
 ------------------------------------------------------- */
 const wallMat = new THREE.MeshLambertMaterial({color: 0xc90000});
 const floorMat = new THREE.MeshLambertMaterial({color: 0x007f00});
-// We will clone this material and change its color for each bulb upon creation
 const baseBulbMat = new THREE.MeshLambertMaterial({emissive: 0x000000}); 
 const enemyMat = new THREE.MeshLambertMaterial({color:0xdd0000});
 const portalMat = new THREE.MeshLambertMaterial({color:0x00ffee, emissive:0x00ffee, side: THREE.DoubleSide, transparent: true, opacity: 0.8});
@@ -209,18 +380,6 @@ const unlitTreeLightMat = new THREE.MeshLambertMaterial({
     color: 0x333333, 
     emissive: 0x000000
 });
-
-
-/* -------------------------------------------------------
-    LIGHTS
-------------------------------------------------------- */
-const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambient);
-
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(50,100,50);
-scene.add(sun);
-
 
 /* -------------------------------------------------------
     BUILD MAZE & TREE
@@ -298,7 +457,8 @@ function decorateChristmasTree() {
     const treeBaseRadius = cone.geometry.parameters.radius; 
     const treePos = cone.position; 
 
-    const totalLights = NUM_BULBS; 
+    // Use current NUM_BULBS as total lights, up to a sensible limit (e.g., 50)
+    const totalLights = Math.min(NUM_BULBS, 50); 
     const numTurns = 7; 
     const lightGeo = new THREE.SphereGeometry(0.1, 8, 8); 
 
@@ -354,7 +514,7 @@ function spawnBulbs(maze) {
 
         if (maze[y][x] === 0 && (x !== 1 || y !== 1) && !isInCenter) { 
             
-            // --- NEW: Assign RGB Color to Collectible Bulb ---
+            // --- Assign RGB Color to Collectible Bulb ---
             const colorIndex = seededRandom(RGB_COLORS.length);
             const rgbColor = RGB_COLORS[colorIndex];
 
@@ -372,7 +532,8 @@ function spawnBulbs(maze) {
 
 function spawnEnemies(maze) {
     const enemyGeo = new THREE.BoxGeometry(1, 1.8, 1);
-    while (enemies.length < NUM_ENEMIES) {
+    // Keep a constant number of enemies for all levels
+    while (enemies.length < NUM_ENEMIES) { 
         let x = seededRandom(W);
         let y = seededRandom(H);
         if (maze[y][x] === 0 && (x !== 1 || y !== 1)) {
@@ -428,6 +589,14 @@ function createPortal() {
 }
 
 function initGame() {
+    // Set level parameters
+    W = Math.max(3, Math.floor(BASE_W * currentSettings.sizeMultiplier / 2) * 2 + 1);
+    H = Math.max(3, Math.floor(BASE_H * currentSettings.sizeMultiplier / 2) * 2 + 1);
+    NUM_BULBS = currentSettings.bulbCount;
+    // Ambient light is set by slider
+    ambient.intensity = parseFloat(document.getElementById('ambient-slider').value); 
+
+    // Regenerate and build the maze
     currentMaze = generateMaze(W,H);
     buildMaze(currentMaze);
     decorateChristmasTree(); 
@@ -435,6 +604,7 @@ function initGame() {
     spawnEnemies(currentMaze);
     createPortal();
     
+    // Reset player position to start cell (1, 1)
     cameraHolder.position.set(CELL, PLAYER_HEIGHT, CELL);
     cameraHolder.rotation.y = 0;
     camera.rotation.x = 0;
@@ -442,21 +612,101 @@ function initGame() {
     pitch = 0;
 }
 
+// Initial setup call
 initGame();
 
+// NEW: Function to toggle pause state and menu visibility
+function togglePause() {
+    isPaused = !isPaused;
+    const selector = document.getElementById('level-selector');
+    
+    if (isPaused) {
+        // Show menu and prevent movement
+        selector.style.display = 'block';
+        if (animationFrameId !== null) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        document.exitPointerLock(); // Release mouse lock
+    } else {
+        // Hide menu and resume game
+        selector.style.display = 'none';
+        if (animationFrameId === null) {
+            animate(0); // Restart the loop
+        }
+        document.body.requestPointerLock(); // Re-lock mouse
+    }
+}
+
+// NEW: Dynamically create level buttons
+function createLevelSelectorButtons() {
+    const container = document.getElementById('level-buttons');
+    LEVEL_SETTINGS.forEach(setting => {
+        const button = document.createElement('button');
+        button.textContent = `Level ${setting.level}`;
+        button.onclick = () => {
+            // Reset the maze with the selected level
+            resetLevel(setting.level); 
+        };
+        container.appendChild(button);
+    });
+}
+createLevelSelectorButtons();
+
+/* --- Window Resizing --- */
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+window.addEventListener('resize', onWindowResize, false);
+
+/* --- Ambient Brightness Slider Event (Changes Sky Color and Percentage) --- */
+document.getElementById('ambient-slider').addEventListener('input', (event) => {
+    const intensity = parseFloat(event.target.value);
+    
+    // 1. Update Ambient Light
+    ambient.intensity = intensity;
+
+    // 2. Update Percentage Display
+    document.getElementById('brightness-percent').textContent = `${Math.round(intensity * 100)}%`;
+
+    // 3. Interpolate Sky Color (Blue to Black)
+    const baseColor = new THREE.Color(0x000000); // Black (Night)
+    const targetColor = new THREE.Color(0x87CEEB); // Sky Blue (Day)
+    const t = Math.max(0, Math.min(1, intensity * 1.5)); 
+    
+    const newColor = baseColor.clone().lerp(targetColor, t);
+    scene.background = newColor;
+
+    // 4. Adjust Directional Light (Sun) visibility
+    sun.visible = intensity > 0.1;
+});
 
 /* -------------------------------------------------------
     INPUT & COLLISION
 ------------------------------------------------------- */
 document.addEventListener('keydown', e => {
+    // P Key to Pause/Open Selector
+    if (e.code === 'KeyP') {
+        togglePause();
+        return; 
+    }
+    
+    // Only process movement keys if not paused
+    if (isPaused) return;
+
     if (e.code === 'KeyW') moveForward = true;
     if (e.code === 'KeyS') moveBackward = true;
     if (e.code === 'KeyA') moveLeft = true;
     if (e.code === 'KeyD') moveRight = true;
     if (e.code === 'KeyQ') moveUp = true;
     if (e.code === 'KeyE') moveDown = true;
+    // Shift to Run
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isRunning = true;
     
-    if (e.code === 'KeyF') {
+    // Fly mode toggle on 'F'
+    if (e.code === 'KeyF') { 
           isFlying = !isFlying;
           if (!isFlying) {
             cameraHolder.position.y = PLAYER_HEIGHT;
@@ -478,10 +728,12 @@ document.addEventListener('keyup', e => {
     if (e.code === 'KeyD') moveRight = false;
     if (e.code === 'KeyQ') moveUp = false;
     if (e.code === 'KeyE') moveDown = false;
+    // Stop Running
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') isRunning = false;
 });
 
 document.addEventListener("mousemove", e => {
-    if (document.pointerLockElement !== document.body) return;
+    if (document.pointerLockElement !== document.body || isPaused) return;
     yaw -= e.movementX * 0.002;
     pitch -= e.movementY * 0.002;
     pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
@@ -490,7 +742,10 @@ document.addEventListener("mousemove", e => {
 });
 
 document.body.addEventListener("click", () => {
-    document.body.requestPointerLock();
+    // Only request pointer lock if the game is not paused
+    if (!isPaused) {
+        document.body.requestPointerLock();
+    }
 });
 
 function checkTreeCollision(x, z, radius) {
@@ -530,7 +785,6 @@ function worldToMaze(pos) {
 }
 
 function findPath(start, end, maze) {
-    // Pathfinding logic... (remains unchanged)
     let queue = [{ pos: start, path: [] }];
     let visited = Array.from({length: H}, () => Array(W).fill(false));
 
@@ -562,12 +816,22 @@ let enemyPaths = new Map();
     GAME LOOP
 ------------------------------------------------------- */
 function animate(time) {
-    requestAnimationFrame(animate);
+    // Stop the loop if paused
+    if (isPaused) {
+        animationFrameId = null;
+        return;
+    }
+    
+    animationFrameId = requestAnimationFrame(animate);
 
     // Update FPS Counter
     updateFPS(time);
 
-    const speed = isFlying ? 0.3 : 0.1;
+    // Dynamic Speed based on running state
+    let baseSpeed = 0.1;
+    let runMultiplier = 2.5; 
+    const speed = isFlying ? 0.3 : (isRunning ? baseSpeed * runMultiplier : baseSpeed);
+
     let newPos = cameraHolder.position.clone();
 
     /* ----- Player Movement ----- */
@@ -600,7 +864,7 @@ function animate(time) {
         cameraHolder.position.z = newPos.z;
     }
     
-    // Vertical movement/gravity... (unchanged)
+    // Vertical movement/gravity... 
     if (isFlying) {
         if (moveUp) {
             cameraHolder.position.y += speed;
@@ -621,15 +885,15 @@ function animate(time) {
             isFalling = true;
         }
     }
-
-
+    
     /* ----- Bulb collection and Tree Light Update ----- */
     for (let i=bulbs.length-1; i>=0; i--) {
         if (cameraHolder.position.distanceTo(bulbs[i].position) < 1.5) {
             scene.remove(bulbs[i]);
+            disposeMeshes(bulbs[i]);
             bulbs.splice(i,1);
             collected++;
-            document.getElementById('overlay').textContent = `Bulbs Collected: ${collected} / ${NUM_BULBS} (Press F to Toggle Fly Mode, Q/E for Vertical Flight)`;
+            document.getElementById('overlay').textContent = `Level ${currentLevel} | Bulbs Collected: ${collected} / ${NUM_BULBS} (Press SHIFT to Run, F to Toggle Fly Mode, Q/E for Vertical Flight)`;
             
             // Light up a decorative tree light
             if (collected > 0 && collected <= treeLights.length) {
@@ -647,7 +911,7 @@ function animate(time) {
         }
     }
 
-    /* ----- Enemies movement and Collision (Restart Game) ----- */
+    /* ----- Enemies movement and Collision ----- */
     enemies.forEach(e => {
         const enemySpeed = 0.05;
         
@@ -655,7 +919,11 @@ function animate(time) {
         let targetCell = worldToMaze(cameraHolder.position);
         
         let currentPath = enemyPaths.get(e);
-        if (!currentPath || currentPath.length === 0) {
+        if (!currentPath || currentPath.length === 0 || 
+            (currentPath.length > 0 && 
+             Math.abs(e.position.x - currentPath[0].x * CELL) < 0.1 && 
+             Math.abs(e.position.z - currentPath[0].y * CELL) < 0.1)) {
+             
              currentPath = findPath(startCell, targetCell, currentMaze);
              enemyPaths.set(e, currentPath || []);
         }
@@ -674,26 +942,26 @@ function animate(time) {
             }
         }
         
-        // Seamless Game Restart on Enemy Collision
+        // Seamless Game Restart on Enemy Collision (Death)
         if (cameraHolder.position.distanceTo(e.position) < 1) {
-            resetLevel();
+            resetLevel(); 
             return;
         }
     });
 
-    /* ----- Portal Win and Seamless Level Restart ----- */
+    /* ----- Portal Win and Seamless Level Advance ----- */
     if (portal.visible) {
-        // Portal is no longer spinning!
         if (cameraHolder.position.distanceTo(portal.position) < 2) {
-            resetLevel(); // Restart the game with a new maze seed
+            resetLevel(currentLevel, true);
+            return;
         }
     }
 
     renderer.render(scene, camera);
 }
 
+// Start the animation loop initially
 animate(0); 
-
 </script>
-</body>
+</body> 
 </html>
