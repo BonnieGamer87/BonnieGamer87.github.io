@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Christmas Maze 3D - Progressive Levels</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+    <style>
+        /* CSS Reset for full-screen */
+        html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+        canvas{display:block;width:100%;height:100%}
+        
+        /* Overlay and FPS Counters */
+        #overlay,#fps{
+            position:absolute;
+            color:#fff;
+            font-family:sans-serif;
+            text-shadow:2px 2px 4px #000;
+            z-index:10;
+            pointer-events:none
+        }
+        #overlay{top:10px;left:10px;font-size:24px}
+        #fps{top:10px;right:10px;font-size:18px;text-shadow:1px 1px 2px #000}
+        
+        /* Brightness Control Panel */
+        #brightness-control{
+            position:absolute;
+            top:40px;
+            right:10px;
+            z-index:10;
+            padding:5px;
+            background:rgba(0,0,0,.5);
+            border-radius:5px;
+            color:#fff;
+            font-family:sans-serif;
+            font-size:14px
+        }
+        #brightness-control label{display:block;margin-bottom:5px}
+        
+        /* Level Selector / Pause Menu */
+        #level-selector{
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%,-50%);
+            z-index:100;
+            padding:30px;
+            background:rgba(0,0,0,.9);
+            border:3px solid #c90000;
+            border-radius:10px;
+            color:#fff;
+            font-family:sans-serif;
+            text-align:center;
+            display:none /* Hidden until paused */
+        }
+        #level-selector button{
+            display:block;
+            width:150px;
+            padding:10px;
+            margin:10px auto;
+            background-color:#007f00;
+            color:#fff;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+            font-size:16px;
+            transition:background-color .2s
+        }
+        #level-selector button:hover{background-color:#009900}
+    </style>
+</head>
+<body>
+
+    <div id="overlay">Level 1 | Bulbs Collected: 0 / 10 (Press SHIFT to Run, F for Fly Mode, **L for Flashlight**)</div>
+    <div id="fps">FPS: 0</div>
+    
+    <div id="brightness-control">
+        <label for="ambient-slider">Ambient Brightness: <span id="brightness-percent">60%</span></label>
+        <input type="range" id="ambient-slider" min="0.01" max="1.0" step="0.01" value="0.6">
+    </div>
+    
+    <div id="level-selector">
+        <h2>Select Level (1 - 5)</h2>
+        <div id="level-buttons"></div>
+        <p style="font-size:12px;margin-top:20px">Press P to resume game.</p>
+    </div>
+
+    <script>
+        // --- CONSTANTS AND LEVEL SETTINGS ---
+        const CELL = 4.5, BASE_W = 31, BASE_H = 31, PLAYER_HEIGHT = 2, NUM_ENEMIES = 4;
+        
+        // Minified Decimals: 16711680 (Red), 65280 (Green), 255 (Blue)
+        const RGB_COLORS = [
+            new THREE.Color(0xFF0000), 
+            new THREE.Color(0x00FF00), 
+            new THREE.Color(0x0000FF)
+        ];
+        
+        const TRUNK_VISIBLE_HEIGHT = 1.5, TRUNK_RADIUS = .8;
+        const CONE_HEIGHT = CELL * 3, CONE_BASE_RADIUS = CELL * 1;
+        const WALL_WIDTH = CELL, WALL_HEIGHT = CELL * 2.5;
+        
+        const LEVEL_SETTINGS = [
+            { level: 1, sizeMultiplier: 1, bulbCount: 10, ambientIntensity: .6 },
+            { level: 2, sizeMultiplier: 1.25, bulbCount: 20, ambientIntensity: .4 },
+            { level: 3, sizeMultiplier: 1.5, bulbCount: 30, ambientIntensity: .25 },
+            { level: 4, sizeMultiplier: 1.75, bulbCount: 40, ambientIntensity: .15 },
+            { level: 5, sizeMultiplier: 2, bulbCount: 50, ambientIntensity: .05 }
+        ];
+
+        // --- GLOBAL VARIABLES (STATE) ---
+        let W, H, NUM_BULBS, mazeSeed = Date.now(), originalLevelSeed = mazeSeed, currentLevel = 1, isPaused = false, animationFrameId = null;
+        let flashlight, isFlashlightOn = false, currentSettings = LEVEL_SETTINGS[0];
+
+        // --- SCENE SETUP (THREE.JS) ---
+        const scene = new THREE.Scene;
+        // Minified Decimal: 8900347 (Sky Blue)
+        scene.background = new THREE.Color(0x87CEEB); 
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, .1, 2000);
+        const renderer = new THREE.WebGLRenderer;
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        const cameraHolder = new THREE.Object3D;
+        cameraHolder.add(camera);
+        scene.add(cameraHolder);
+
+        // --- PLAYER / GAME STATE VARIABLES ---
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, moveUp = false, moveDown = false, isRunning = false;
+        let yaw = 0, pitch = 0, isFlying = false, gravity = .015, jumpVelocity = 0, isJumping = false, isFalling = false;
+        let walls = [], bulbs = [], enemies = [], collected = 0, portal, treeLights = [], christmasTree, portalCubeCenter;
+        let lastTime = 0, frameCount = 0, fps = 0;
+        
+        // --- MATERIALS (WITH REQUESTED COLORS) ---
+        // WALLS: CHANGED TO RED (0xFF0000)
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xFF0000 });
+        // FLOOR: Dark Green (0x007000)
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x007000 });
+        
+        const baseBulbMat = new THREE.MeshLambertMaterial({ emissive: 0 });
+        // ENEMY: Light Gray (0xDDDDDD)
+        const enemyMat = new THREE.MeshStandardMaterial({ color: 0xDDDDDD });
+        // PORTAL: Cyan (0x00FFFF)
+        const portalMat = new THREE.MeshLambertMaterial({ color: 0x00FFFF, emissive: 0x00FFFF, side: THREE.DoubleSide, transparent: true, opacity: .8 });
+        // WIRE: Gray (0x888888)
+        const wireMat = new THREE.LineBasicMaterial({ color: 0x888888, linewidth: 3 });
+        // TREE CONE: CHANGED TO GREEN (0x008000)
+        const treeMat = new THREE.MeshStandardMaterial({ color: 0x008000 });
+        // UNLIT LIGHT: Dark Gray (0x333333)
+        const unlitTreeLightMat = new THREE.MeshLambertMaterial({ color: 0x333333, emissive: 0 });
+
+        // --- LIGHTING ---
+        const ambient = new THREE.AmbientLight(0xFFFFFF, currentSettings.ambientIntensity);
+        scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xFFFFFF, 1);
+        sun.position.set(50, 100, 50);
+        scene.add(sun);
+        document.getElementById("ambient-slider").value = currentSettings.ambientIntensity;
+
+        // --- FLASHLIGHT FUNCTIONS ---
+        function setupFlashlight(){
+            flashlight = new THREE.SpotLight(0xFFFFFF, 0, 150, Math.PI / 4, .5, 1.5);
+            flashlight.position.set(0, 0, 0);
+            flashlight.target.position.set(0, 0, -1);
+            flashlight.power = 0;
+            flashlight.castShadow = true;
+            flashlight.shadow.mapSize.width = 1024;
+            flashlight.shadow.mapSize.height = 1024;
+            camera.add(flashlight);
+            camera.add(flashlight.target);
+        }
+        function toggleFlashlight(){
+            isFlashlightOn = !isFlashlightOn;
+            flashlight.power = isFlashlightOn ? 50 : 0;
+        }
+
+        // --- UTILITY FUNCTIONS ---
+        function seededRandom(max, min = 0){
+            mazeSeed = (mazeSeed * 9301 + 49297) % 233280;
+            let rnd = mazeSeed / 233280;
+            return Math.floor(min + rnd * (max - min));
+        }
+        function updateFPS(time){
+            frameCount++;
+            const delta = time - lastTime;
+            if (delta >= 1000){
+                fps = Math.round(frameCount / (delta / 1000));
+                document.getElementById("fps").textContent = `FPS: ${fps}`;
+                lastTime = time;
+                frameCount = 0;
+            }
+        }
+        function disposeMeshes(object){
+            if (object.geometry) object.geometry.dispose();
+            if (object.material){
+                Array.isArray(object.material) ? object.material.forEach(m => m.dispose()) : object.material.dispose();
+            }
+        }
+        
+        // --- LEVEL MANAGEMENT ---
+        function resetLevel(newLevel = currentLevel, nextLevel = false){
+            let newSeed = Date.now();
+            const MAX_LEVEL = LEVEL_SETTINGS.length;
+            
+            if (nextLevel && newLevel < MAX_LEVEL){
+                currentLevel = newLevel + 1;
+                originalLevelSeed = newSeed;
+            } else if (nextLevel && newLevel === MAX_LEVEL){
+                alert("CONGRATULATIONS! You completed the final level!");
+                currentLevel = 1;
+                originalLevelSeed = newSeed;
+            } else if (newLevel !== currentLevel){
+                currentLevel = newLevel;
+                originalLevelSeed = newSeed;
+            } else if (!nextLevel) newSeed = originalLevelSeed;
+
+            currentSettings = LEVEL_SETTINGS.find(s => s.level === currentLevel);
+            W = Math.max(3, Math.floor(BASE_W * currentSettings.sizeMultiplier / 2) * 2 + 1);
+            H = Math.max(3, Math.floor(BASE_H * currentSettings.sizeMultiplier / 2) * 2 + 1);
+            NUM_BULBS = currentSettings.bulbCount;
+
+            // Update UI elements
+            const initialIntensity = parseFloat(document.getElementById("ambient-slider").value);
+            ambient.intensity = initialIntensity;
+            document.getElementById("brightness-percent").textContent = `${Math.round(initialIntensity * 100)}%`;
+            document.getElementById("overlay").textContent = `Level ${currentLevel} | Bulbs Collected: ${collected} / ${NUM_BULBS} (Press SHIFT to Run, F for Fly Mode, **L for Flashlight**)`;
+
+            // Clear the scene except for essentials
+            const objectsToKeep = [cameraHolder, ambient, sun];
+            for (let i = scene.children.length - 1; i >= 0; i--){
+                let obj = scene.children[i];
+                if (!objectsToKeep.includes(obj)){
+                    scene.remove(obj);
+                    if (obj.isGroup) obj.children.forEach(disposeMeshes);
+                    disposeMeshes(obj);
+                }
+            }
+
+            walls.length = 0;
+            bulbs.length = 0;
+            enemies.length = 0;
+            treeLights.length = 0;
+            collected = 0;
+            mazeSeed = newSeed;
+            enemyPaths.clear();
+
+            if (isPaused) togglePause();
+            setTimeout(initGame, 0);
+        }
+
+        // --- MAZE GENERATION ---
+        let currentMaze;
+        function generateMaze(w, h){
+            let maze = Array.from({ length: h }, () => Array(w).fill(1));
+            
+            function carve(x, y){
+                maze[y][x] = 0;
+                let dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].sort(() => Math.random() - .5);
+                for (let [dx, dy] of dirs){
+                    let nx = x + dx, ny = y + dy;
+                    if (nx > 0 && nx < w - 1 && ny > 0 && ny < h - 1 && maze[ny][nx] === 1){
+                        maze[y + dy / 2][x + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+            carve(1, 1);
+            
+            // Create a center clearing for the Christmas tree
+            const centerSize = 7;
+            const centerStart = Math.floor((w - centerSize) / 2);
+            for (let y = 0; y < centerSize; y++){
+                for (let x = 0; x < centerSize; x++){
+                    let cx = centerStart + x, cy = centerStart + y;
+                    if (cx > 0 && cx < w - 1 && cy > 0 && cy < h - 1) maze[cy][cx] = 0;
+                }
+            }
+            
+            // Trap generation for higher levels
+            if (currentLevel >= 4){
+                const trapChance = currentLevel * .005;
+                const playerStartX = 1, playerStartY = 1;
+                for (let y = 1; y < h - 1; y++){
+                    for (let x = 1; x < w - 1; x++){
+                        if (maze[y][x] === 0 && (x !== playerStartX || y !== playerStartY) && (x % 2 !== 0 || y % 2 !== 0)){
+                            if (Math.random() < trapChance){
+                                maze[y][x] = 1;
+                                if (x % 2 === 1 && y % 2 === 0 && x + 1 < w - 1) maze[y][x + 1] = 1;
+                                if (x % 2 === 0 && y % 2 === 1 && y + 1 < h - 1) maze[y + 1][x] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+            return maze;
+        }
+
+        // --- OBJECT CREATION ---
+        function createChristmasTree(){
+            const centerSize = 7;
+            const centerMiddle = Math.floor((W - centerSize) / 2) + Math.floor(centerSize / 2);
+            const treeWorldX = centerMiddle * CELL;
+            const treeWorldZ = centerMiddle * CELL;
+            portalCubeCenter = new THREE.Vector3(treeWorldX, 0, treeWorldZ);
+
+            // Trunk
+            const trunkHeight = TRUNK_VISIBLE_HEIGHT;
+            const trunkGeo = new THREE.CylinderGeometry(TRUNK_RADIUS, TRUNK_RADIUS, trunkHeight, 16);
+            // Trunk Color: Brown (0x582C0E)
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x582C0E }); 
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.set(treeWorldX, trunkHeight / 2, treeWorldZ);
+            trunk.castShadow = true;
+
+            // Cone (Tree)
+            const coneStartHeight = trunkHeight;
+            const coneTotalHeight = CONE_HEIGHT;
+            const treeBaseRadius = CONE_BASE_RADIUS;
+            const coneGeo = new THREE.ConeGeometry(treeBaseRadius, coneTotalHeight, 32);
+            const cone = new THREE.Mesh(coneGeo, treeMat); // Uses the updated GREEN treeMat
+            cone.position.set(treeWorldX, coneStartHeight + coneTotalHeight / 2, treeWorldZ);
+            cone.castShadow = true;
+
+            christmasTree = new THREE.Group;
+            christmasTree.add(cone);
+            christmasTree.add(trunk);
+            christmasTree.isCollidable = true;
+            christmasTree.collisionRadius = CONE_BASE_RADIUS * .9;
+            scene.add(christmasTree);
+        }
+
+        function buildMaze(maze){
+            const floorGeo = new THREE.PlaneGeometry(CELL, CELL);
+            const wallGeo = new THREE.BoxGeometry(WALL_WIDTH, WALL_HEIGHT, WALL_WIDTH);
+            
+            for (let y = 0; y < H; y++){
+                for (let x = 0; x < W; x++){
+                    let wx = x * CELL, wz = y * CELL;
+                    
+                    // Floor tile
+                    let f = new THREE.Mesh(floorGeo, floorMat);
+                    f.rotation.x = -Math.PI / 2;
+                    f.position.set(wx, 0, wz);
+                    f.receiveShadow = true;
+                    scene.add(f);
+                    
+                    // Wall
+                    if (maze[y][x] === 1){
+                        let w = new THREE.Mesh(wallGeo, wallMat); // Uses the updated RED wallMat
+                        w.position.set(wx, WALL_HEIGHT / 2, wz);
+                        w.isCollidable = true;
+                        w.collisionSizeX = WALL_WIDTH / 2;
+                        w.collisionSizeZ = WALL_WIDTH / 2;
+                        w.castShadow = true;
+                        w.receiveShadow = true;
+                        scene.add(w);
+                        walls.push(w);
+                    }
+                }
+            }
+            createChristmasTree();
+        }
+
+        function decorateChristmasTree(){
+            if (!christmasTree) return;
+            const cone = christmasTree.children.find(c => c.geometry.type === "ConeGeometry");
+            if (!cone) return;
+
+            const coneTotalHeight = cone.geometry.parameters.height;
+            const treeBaseRadius = cone.geometry.parameters.radius;
+            const treePos = cone.position;
+            const totalLights = Math.min(NUM_BULBS, 50), numTurns = 7;
+            const lightGeo = new THREE.SphereGeometry(.1, 8, 8);
+            
+            let spiralPoints = [];
+            const detail = 50;
+            const numWireSegments = detail * numTurns;
+            const CONE_BOTTOM_Y = cone.position.y - (coneTotalHeight / 2);
+
+            // Generate spiral wire path points
+            for (let i = 0; i <= numWireSegments; i++){
+                const heightRatio = i / numWireSegments;
+                const angle = heightRatio * Math.PI * 2 * numTurns;
+                const y = CONE_BOTTOM_Y + heightRatio * coneTotalHeight;
+                const radiusRatio = 1 - heightRatio;
+                const currentRadius = treeBaseRadius * radiusRatio * 1.05;
+                const x = treePos.x + currentRadius * Math.cos(angle);
+                const z = treePos.z + currentRadius * Math.sin(angle);
+                spiralPoints.push(new THREE.Vector3(x, y, z));
+            }
+
+            // Create wire
+            const curve = new THREE.CatmullRomCurve3(spiralPoints);
+            const wireGeometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(numWireSegments * 3));
+            const line = new THREE.Line(wireGeometry, wireMat);
+            scene.add(line);
+
+            // Place collectible bulbs along the wire
+            for (let i = 0; i < totalLights; i++){
+                const t = i / totalLights;
+                const lightPos = curve.getPointAt(t);
+                const individualLightMat = unlitTreeLightMat.clone();
+                const bulb = new THREE.Mesh(lightGeo, individualLightMat);
+                bulb.position.copy(lightPos);
+                bulb.castShadow = true;
+                scene.add(bulb);
+                treeLights.push(bulb);
+            }
+        }
+
+        function spawnBulbs(maze){
+            const bulbGeo = new THREE.SphereGeometry(.5, 16, 16);
+            const centerSize = 7;
+            const centerStart = Math.floor((W - centerSize) / 2);
+            const centerEnd = centerStart + centerSize - 1;
+            
+            while (bulbs.length < NUM_BULBS){
+                let x = seededRandom(W), y = seededRandom(H);
+                const isInCenter = x >= centerStart && x <= centerEnd && y >= centerStart && y <= centerEnd;
+                
+                // Spawn only in open areas, not at player start (1,1), and not in the center
+                if (maze[y][x] === 0 && (x !== 1 || y !== 1) && !isInCenter){
+                    const colorIndex = seededRandom(RGB_COLORS.length);
+                    const rgbColor = RGB_COLORS[colorIndex];
+                    const bulbMat = baseBulbMat.clone();
+                    bulbMat.color.copy(rgbColor);
+                    bulbMat.emissive.copy(rgbColor).multiplyScalar(.7);
+                    
+                    let b = new THREE.Mesh(bulbGeo, bulbMat);
+                    b.position.set(x * CELL, 1.2, y * CELL);
+                    b.castShadow = true;
+                    scene.add(b);
+                    bulbs.push(b);
+                }
+            }
+        }
+
+        function spawnEnemies(maze){
+            const enemyGeo = new THREE.BoxGeometry(1, 1.8, 1);
+            while (enemies.length < NUM_ENEMIES){
+                let x = seededRandom(W), y = seededRandom(H);
+                if (maze[y][x] === 0 && (x !== 1 || y !== 1)){
+                    let e = new THREE.Mesh(enemyGeo, enemyMat);
+                    e.position.set(x * CELL, .9, y * CELL);
+                    e.castShadow = true;
+                    scene.add(e);
+                    enemies.push(e);
+                }
+            }
+        }
+
+        function createPortal(){
+            const portalWidth = 3, portalHeight = 5;
+            const cubeSide = CONE_BASE_RADIUS * 1.5 + 1;
+            
+            portal = new THREE.Mesh(new THREE.PlaneGeometry(portalWidth, portalHeight), portalMat);
+            portal.position.y = portalHeight / 2 + .05;
+            portal.visible = false; // Hidden until all bulbs are collected
+
+            // Determine portal position and rotation around the Christmas tree
+            const side = seededRandom(4);
+            let offsetX = 0, offsetZ = 0, rotationY = 0;
+            switch (side){
+                case 0: offsetZ = cubeSide / 2 + portalWidth / 2; rotationY = 0; break;
+                case 1: offsetX = cubeSide / 2 + portalWidth / 2; rotationY = Math.PI / 2; break;
+                case 2: offsetZ = -(cubeSide / 2 + portalWidth / 2); rotationY = Math.PI; break;
+                case 3: offsetX = -(cubeSide / 2 + portalWidth / 2); rotationY = -Math.PI / 2; break;
+            }
+
+            portal.position.x = portalCubeCenter.x + offsetX;
+            portal.position.z = portalCubeCenter.z + offsetZ;
+            portal.rotation.y = rotationY;
+            scene.add(portal);
+        }
+
+        // --- GAME INITIALIZATION ---
+        function initGame(){
+            W = Math.max(3, Math.floor(BASE_W * currentSettings.sizeMultiplier / 2) * 2 + 1);
+            H = Math.max(3, Math.floor(BASE_H * currentSettings.sizeMultiplier / 2) * 2 + 1);
+            NUM_BULBS = currentSettings.bulbCount;
+            ambient.intensity = parseFloat(document.getElementById("ambient-slider").value);
+
+            currentMaze = generateMaze(W, H);
+            buildMaze(currentMaze);
+            decorateChristmasTree();
+            spawnBulbs(currentMaze);
+            spawnEnemies(currentMaze);
+            createPortal();
+            
+            if (!flashlight) setupFlashlight();
+
+            // Reset player position and rotation
+            cameraHolder.position.set(CELL, PLAYER_HEIGHT, CELL);
+            cameraHolder.rotation.y = 0;
+            camera.rotation.x = 0;
+            yaw = 0;
+            pitch = 0;
+        }
+        initGame(); // Start the first level
+
+        // --- PAUSE/MENU FUNCTIONS ---
+        function togglePause(){
+            isPaused = !isPaused;
+            const selector = document.getElementById("level-selector");
+            if (isPaused){
+                selector.style.display = "block";
+                if (animationFrameId !== null){
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                document.exitPointerLock();
+            } else {
+                selector.style.display = "none";
+                if (animationFrameId === null) animate(0);
+                document.body.requestPointerLock();
+            }
+        }
+        function createLevelSelectorButtons(){
+            const container = document.getElementById("level-buttons");
+            LEVEL_SETTINGS.forEach(setting => {
+                const button = document.createElement("button");
+                button.textContent = `Level ${setting.level}`;
+                button.onclick = () => { resetLevel(setting.level); };
+                container.appendChild(button);
+            });
+        }
+        createLevelSelectorButtons();
+
+        // --- EVENT LISTENERS ---
+        function onWindowResize(){
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener("resize", onWindowResize, false);
+
+        document.getElementById("ambient-slider").addEventListener("input", event => {
+            const intensity = parseFloat(event.target.value);
+            ambient.intensity = intensity;
+            document.getElementById("brightness-percent").textContent = `${Math.round(intensity * 100)}%`;
+            
+            // Adjust scene background color based on ambient brightness
+            const baseColor = new THREE.Color(0);
+            const targetColor = new THREE.Color(0x87CEEB);
+            const t = Math.max(0, Math.min(1, intensity * 1.5));
+            const newColor = baseColor.clone().lerp(targetColor, t);
+            scene.background = newColor;
+            
+            sun.visible = intensity > .1;
+        });
+
+        document.addEventListener("keydown", e => {
+            if (e.code === "KeyP"){ togglePause(); return; }
+            if (e.code === "KeyL"){ toggleFlashlight(); return; }
+            if (isPaused) return;
+
+            if (e.code === "KeyW") moveForward = true;
+            if (e.code === "KeyS") moveBackward = true;
+            if (e.code === "KeyA") moveLeft = true;
+            if (e.code === "KeyD") moveRight = true;
+            if (e.code === "KeyQ") moveUp = true;
+            if (e.code === "KeyE") moveDown = true;
+            
+            if (e.code === "ShiftLeft" || e.code === "ShiftRight") isRunning = true;
+            
+            if (e.code === "KeyF"){ // Toggle Fly Mode
+                isFlying = !isFlying;
+                if (!isFlying){
+                    cameraHolder.position.y = PLAYER_HEIGHT;
+                    isJumping = false;
+                    isFalling = false;
+                }
+            }
+            if (e.code === "Space" && !isFlying && !isJumping && !isFalling){
+                isJumping = true;
+                jumpVelocity = .5;
+            }
+        });
+
+        document.addEventListener("keyup", e => {
+            if (e.code === "KeyW") moveForward = false;
+            if (e.code === "KeyS") moveBackward = false;
+            if (e.code === "KeyA") moveLeft = false;
+            if (e.code === "KeyD") moveRight = false;
+            if (e.code === "KeyQ") moveUp = false;
+            if (e.code === "KeyE") moveDown = false;
+            if (e.code === "ShiftLeft" || e.code === "ShiftRight") isRunning = false;
+        });
+
+        document.addEventListener("mousemove", e => {
+            if (document.pointerLockElement !== document.body || isPaused) return;
+            
+            yaw -= e.movementX * .002;
+            pitch -= e.movementY * .002;
+            pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+            
+            cameraHolder.rotation.y = yaw;
+            camera.rotation.x = pitch;
+        });
+
+        document.body.addEventListener("click", () => {
+            if (!isPaused) document.body.requestPointerLock();
+        });
+
+        // --- COLLISION AND PATHFINDING ---
+        function checkTreeCollision(x, z, radius){
+            if (!christmasTree || !christmasTree.isCollidable) return false;
+            const treeCenter = new THREE.Vector3(christmasTree.position.x, 0, christmasTree.position.z);
+            const playerCenter = new THREE.Vector3(x, 0, z);
+            const distance = treeCenter.distanceTo(playerCenter);
+            return distance < christmasTree.collisionRadius + radius;
+        }
+
+        function canMoveTo(x, z, radius = .5){
+            if (isFlying) return true;
+            
+            // Check wall collisions
+            for (let w of walls){
+                if (Math.abs(w.position.x - x) < w.collisionSizeX + radius && Math.abs(w.position.z - z) < w.collisionSizeZ + radius) return false;
+            }
+            // Check tree collision
+            if (checkTreeCollision(x, z, radius)) return false;
+            
+            return true;
+        }
+
+        function worldToMaze(pos){
+            return { x: Math.round(pos.x / CELL), y: Math.round(pos.z / CELL) };
+        }
+
+        function findPath(start, end, maze){
+            let queue = [{ pos: start, path: [] }];
+            let visited = Array.from({ length: H }, () => Array(W).fill(false));
+            
+            while (queue.length > 0){
+                let { pos, path } = queue.shift();
+
+                if (pos.x === end.x && pos.y === end.y) return path;
+
+                if (pos.x < 0 || pos.x >= W || pos.y < 0 || pos.y >= H || visited[pos.y][pos.x] || maze[pos.y][pos.x] === 1) continue;
+                
+                visited[pos.y][pos.x] = true;
+                
+                const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                for (let [dx, dy] of directions){
+                    let nextPos = { x: pos.x + dx, y: pos.y + dy };
+                    let newPath = [...path, nextPos];
+                    queue.push({ pos: nextPos, path: newPath });
+                }
+            }
+            return null;
+        }
+        let enemyPaths = new Map;
+
+        // --- ANIMATION LOOP ---
+        function animate(time){
+            if (isPaused){
+                animationFrameId = null;
+                return;
+            }
+            animationFrameId = requestAnimationFrame(animate);
+
+            updateFPS(time);
+
+            // Player Movement Logic
+            let baseSpeed = .1;
+            let runMultiplier = 2.5;
+            const speed = isFlying ? .3 : isRunning ? baseSpeed * runMultiplier : baseSpeed;
+
+            let newPos = cameraHolder.position.clone();
+            let deltaX = 0, deltaZ = 0;
+
+            if (moveForward){
+                deltaX -= Math.sin(yaw) * speed;
+                deltaZ -= Math.cos(yaw) * speed;
+            }
+            if (moveBackward){
+                deltaX += Math.sin(yaw) * speed;
+                deltaZ += Math.cos(yaw) * speed;
+            }
+            if (moveLeft){
+                deltaX -= Math.cos(yaw) * speed;
+                deltaZ += Math.sin(yaw) * speed;
+            }
+            if (moveRight){
+                deltaX += Math.cos(yaw) * speed;
+                deltaZ -= Math.sin(yaw) * speed;
+            }
+
+            newPos.x += deltaX;
+            newPos.z += deltaZ;
+            
+            // Apply movement only if collision check passes
+            if (canMoveTo(newPos.x, cameraHolder.position.z)) cameraHolder.position.x = newPos.x;
+            if (canMoveTo(cameraHolder.position.x, newPos.z)) cameraHolder.position.z = newPos.z;
+
+            // Flying/Jumping/Gravity
+            if (isFlying){
+                if (moveUp) cameraHolder.position.y += speed;
+                if (moveDown) cameraHolder.position.y = Math.max(.1, cameraHolder.position.y - speed);
+            } else {
+                if (isJumping || isFalling){
+                    cameraHolder.position.y += jumpVelocity;
+                    jumpVelocity -= gravity;
+                }
+                if (cameraHolder.position.y <= PLAYER_HEIGHT){
+                    cameraHolder.position.y = PLAYER_HEIGHT;
+                    isJumping = false;
+                    isFalling = false;
+                } else {
+                    isFalling = true;
+                }
+            }
+
+            // Bulb Collection (Collision Check)
+            for (let i = bulbs.length - 1; i >= 0; i--){
+                if (cameraHolder.position.distanceTo(bulbs[i].position) < 1.5){
+                    scene.remove(bulbs[i]);
+                    disposeMeshes(bulbs[i]);
+                    bulbs.splice(i, 1);
+                    collected++;
+
+                    document.getElementById("overlay").textContent = `Level ${currentLevel} | Bulbs Collected: ${collected} / ${NUM_BULBS} (Press SHIFT to Run, F for Fly Mode, **L for Flashlight**)`;
+
+                    // Light up a tree bulb
+                    if (collected > 0 && collected <= treeLights.length){
+                        const lightIndex = collected - 1;
+                        const treeLight = treeLights[lightIndex];
+                        const colorIndex = seededRandom(RGB_COLORS.length);
+                        const rgbColor = RGB_COLORS[colorIndex];
+                        treeLight.material.color.copy(rgbColor);
+                        treeLight.material.emissive.copy(rgbColor).multiplyScalar(.7);
+                    }
+                    
+                    if (collected === NUM_BULBS) portal.visible = true;
+                }
+            }
+
+            // Enemy Movement and Player Collision
+            enemies.forEach(e => {
+                const enemySpeed = .05;
+                let startCell = worldToMaze(e.position);
+                let targetCell = worldToMaze(cameraHolder.position);
+                let currentPath = enemyPaths.get(e);
+
+                // Recalculate path if none exists, or if the enemy has reached the current waypoint
+                if (!currentPath || currentPath.length === 0 || (currentPath.length > 0 && Math.abs(e.position.x - currentPath[0].x * CELL) < .1 && Math.abs(e.position.z - currentPath[0].y * CELL) < .1)){
+                    currentPath = findPath(startCell, targetCell, currentMaze);
+                    enemyPaths.set(e, currentPath || []);
+                }
+
+                if (currentPath && currentPath.length > 0){
+                    let nextCell = currentPath[0];
+                    let targetWorldX = nextCell.x * CELL;
+                    let targetWorldZ = nextCell.y * CELL;
+                    
+                    // Move enemy towards the next waypoint
+                    let dir = new THREE.Vector3(targetWorldX, e.position.y, targetWorldZ).sub(e.position).normalize();
+                    e.position.addScaledVector(dir, enemySpeed);
+
+                    // Check if waypoint is reached (to pop the next waypoint)
+                    if (e.position.distanceTo(new THREE.Vector3(targetWorldX, e.position.y, targetWorldZ)) < enemySpeed * 2){
+                        currentPath.shift();
+                        enemyPaths.set(e, currentPath);
+                    }
+                }
+                
+                // Enemy-Player collision check (Game Over)
+                if (cameraHolder.position.distanceTo(e.position) < 1){
+                    resetLevel();
+                    return;
+                }
+            });
+
+            // Portal Collision (Level Complete)
+            if (portal.visible){
+                if (cameraHolder.position.distanceTo(portal.position) < 2){
+                    resetLevel(currentLevel, true); // Move to next level
+                    return;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+        
+        animate(0); // Start the animation loop
+
+    </script>
+</body>
+</html>
