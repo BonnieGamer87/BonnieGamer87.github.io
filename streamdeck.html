@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Customizable Stream Deck Mockup</title>
+
+<style>
+/* --- 1. CSS Variables for Customization --- */
+:root {
+  --key-color: #1c1c1c; /* Default key background */
+  --active-color: #0f62fe; /* Default active/press color */
+  --glow-color: #0f62fe; /* Default glow color (matches active) */
+  --glow-intensity: 0.3; /* Default glow intensity (0 to 1) */
+}
+
+/* --- Global Styles --- */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; 
+}
+
+body {
+  background: #0b0b0b;
+  font-family: Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  gap: 40px; /* Space between menu and deck */
+}
+
+/* --- 2. Customization Menu Styles --- */
+.menu {
+  background: #111;
+  padding: 20px;
+  border-radius: 12px;
+  width: 280px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+  align-self: flex-start; /* Align menu to the top */
+  margin-top: 50px;
+  border: 1px solid #222;
+}
+
+.menu h3 {
+  margin-top: 0;
+  color: #0f62fe;
+  border-bottom: 2px solid #222;
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.control-group {
+  margin-bottom: 15px;
+}
+
+.control-group label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 5px;
+  color: #ccc;
+}
+
+.control-group input[type="color"],
+.control-group input[type="range"] {
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* --- Stream Deck Body (The housing) --- */
+.stream-deck-body {
+  padding: 20px;
+  background: #111; 
+  border-radius: 20px;
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.4),
+    0 0 10px rgba(0, 0, 0, 0.6) inset;
+  transform: perspective(1000px) rotateX(10deg); 
+}
+
+/* --- Key Grid Container --- */
+.deck {
+  display: grid;
+  grid-template-columns: repeat(12, 64px); 
+  gap: 12px;
+}
+
+/* --- Individual Key Styles (The buttons) --- */
+.key {
+  width: 64px;
+  height: 64px;
+  
+  /* Use CSS variable for color */
+  background: var(--key-color);
+  
+  border-radius: 8px; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  user-select: none;
+  transition: 0.12s;
+  border: 1px solid #333;
+  
+  /* Add subtle box shadow glow using variables */
+  box-shadow: 
+    0 0 calc(5px * var(--glow-intensity)) var(--glow-color), /* Key Glow */
+    0 4px 0 #111, /* Bottom shadow for raised effect */
+    0 1px 3px rgba(0, 0, 0, 0.8) inset;
+  
+  cursor: pointer; 
+}
+
+.key:hover {
+    filter: brightness(1.2); 
+}
+
+/* --- Active/Press Effect --- */
+.key.active {
+  /* Use CSS variable for active color */
+  background: var(--active-color);
+  
+  /* Press down effect */
+  transform: translateY(2px); 
+  box-shadow: 
+    0 0 calc(10px * var(--glow-intensity)) var(--glow-color), /* Stronger glow on press */
+    0 2px 0 #074099, 
+    0 1px 3px rgba(0, 0, 0, 0.8) inset;
+}
+</style>
+</head>
+<body>
+
+<div class="menu">
+  <h3>Stream Deck Customizer</h3>
+
+  <div class="control-group">
+    <label for="keyColor">Button Background Color</label>
+    <input type="color" id="keyColor" value="#1c1c1c">
+  </div>
+
+  <div class="control-group">
+    <label for="activeColor">Press/Active Color</label>
+    <input type="color" id="activeColor" value="#0f62fe">
+  </div>
+  
+  <div class="control-group">
+    <label for="glowColor">Button Glow Color</label>
+    <input type="color" id="glowColor" value="#0f62fe">
+  </div>
+
+  <div class="control-group">
+    <label for="glowIntensity">Glow Intensity</label>
+    <input type="range" id="glowIntensity" min="0" max="1" step="0.05" value="0.3">
+  </div>
+
+  <p style="font-size: 12px; color: #777; margin-top: 30px;">
+    *To change button icons/labels, you would edit the HTML content of the key (e.g., Q to 🎤).
+  </p>
+</div>
+
+
+<div class="stream-deck-body">
+
+  <div class="deck">
+
+    <div class="key" data-key="`">`</div>
+    <div class="key" data-key="1">1</div>
+    <div class="key" data-key="2">2</div>
+    <div class="key" data-key="3">3</div>
+    <div class="key" data-key="4">4</div>
+    <div class="key" data-key="5">5</div>
+    <div class="key" data-key="6">6</div>
+    <div class="key" data-key="7">7</div>
+    <div class="key" data-key="8">8</div>
+    <div class="key" data-key="9">9</div>
+    <div class="key" data-key="0">0</div>
+    <div class="key" data-key="-">-</div>
+
+    <div class="key" data-key="=">=</div>
+    <div class="key" data-key="q">Q</div>
+    <div class="key" data-key="w">W</div>
+    <div class="key" data-key="e">E</div>
+    <div class="key" data-key="r">R</div>
+    <div class="key" data-key="t">T</div>
+    <div class="key" data-key="y">Y</div>
+    <div class="key" data-key="u">U</div>
+    <div class="key" data-key="i">I</div>
+    <div class="key" data-key="o">O</div>
+    <div class="key" data-key="p">P</div>
+    <div class="key" data-key="[">[</div>
+
+    <div class="key" data-key="]">]</div>
+    <div class="key" data-key="\\">\</div>
+    <div class="key" data-key="a">A</div>
+    <div class="key" data-key="s">S</div>
+    <div class="key" data-key="d">D</div>
+    <div class="key" data-key="f">F</div>
+    <div class="key" data-key="g">G</div>
+    <div class="key" data-key="h">H</div>
+    <div class="key" data-key="j">J</div>
+    <div class="key" data-key="k">K</div>
+    <div class="key" data-key="l">L</div>
+    <div class="key" data-key=";">;</div>
+
+    <div class="key" data-key="'">'</div>
+    <div class="key" data-key="z">Z</div>
+    <div class="key" data-key="x">X</div>
+    <div class="key" data-key="c">C</div>
+    <div class="key" data-key="v">V</div>
+    <div class="key" data-key="b">B</div>
+    <div class="key" data-key="n">N</div>
+    <div class="key" data-key="m">M</div>
+    <div class="key" data-key=",">,</div>
+    <div class="key" data-key=".">.</div>
+    <div class="key" data-key="/">/</div>
+    <div class="key" data-key=" ">SPACE</div> 
+
+  </div>
+</div>
+
+<script>
+// --- Keyboard Flash Logic (Unchanged) ---
+const keys = document.querySelectorAll(".key");
+
+function flash(keyVal) {
+  keys.forEach(k => {
+    if (k.dataset.key === keyVal) {
+      k.classList.add("active");
+      setTimeout(() => k.classList.remove("active"), 150); 
+    }
+  });
+}
+
+document.addEventListener("keydown", e => {
+  if ([" ", "ArrowUp", "ArrowDown"].includes(e.key)) {
+    e.preventDefault();
+  }
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  flash(key);
+  
+  if (key === " ") toggleMedia();
+  if (key === "/") window.open("https://youtube.com", "_blank");
+  if (key === ".") document.documentElement.requestFullscreen();
+});
+
+function toggleMedia() {
+  document.querySelectorAll("video,audio").forEach(m => {
+    m.paused ? m.play() : m.pause();
+  });
+}
+
+// --- 4. Customization Menu Logic (New) ---
+const root = document.documentElement;
+
+// Function to handle CSS variable updates
+function updateCustomization(property, value) {
+  root.style.setProperty(property, value);
+}
+
+// Get all customization inputs
+const keyColorInput = document.getElementById('keyColor');
+const activeColorInput = document.getElementById('activeColor');
+const glowColorInput = document.getElementById('glowColor');
+const glowIntensityInput = document.getElementById('glowIntensity');
+
+// Event Listeners for Color Pickers
+keyColorInput.addEventListener('input', (e) => {
+  updateCustomization('--key-color', e.target.value);
+});
+
+activeColorInput.addEventListener('input', (e) => {
+  updateCustomization('--active-color', e.target.value);
+});
+
+glowColorInput.addEventListener('input', (e) => {
+  updateCustomization('--glow-color', e.target.value);
+});
+
+// Event Listener for Range Slider (Glow Intensity)
+glowIntensityInput.addEventListener('input', (e) => {
+  // Update the CSS variable with the new intensity value
+  updateCustomization('--glow-intensity', e.target.value);
+});
+</script>
+
+</body>
+</html>
