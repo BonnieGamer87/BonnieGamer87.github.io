@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scheduled Timer - Loading...</title>
+<style>
+/* Basic CSS for the Timer Display */
+body {
+font-family: 'Arial', sans-serif;
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+min-height: 100vh;
+margin: 0;
+background-color: #282c34;
+color: white;
+text-align: center;
+}
+#schedule-selector {
+margin-bottom: 20px;
+font-size: 1.2em;
+}
+select {
+padding: 8px 12px;
+border-radius: 5px;
+border: 1px solid #61dafb;
+background-color: #383c44;
+color: white;
+font-size: 1em;
+cursor: pointer;
+}
+#current-time {
+font-size: 4em;
+font-weight: bold;
+letter-spacing: 2px;
+}
+#period-display {
+margin-top: 20px;
+font-size: 1.5em;
+}
+#time-left {
+font-size: 3em;
+color: #61dafb;
+font-weight: 500;
+}
+#status-message {
+margin-top: 10px;
+font-size: 1.2em;
+color: #ccc;
+}
+</style>
+</head>
+<body>
+
+<div id="schedule-selector">
+<label for="schedule-select">Select Schedule:</label>
+<select id="schedule-select">
+<option value="normal">Normal Sche.</option>
+<option value="midterm">Midterm Sche. (12/17 & 12/18)</option>
+</select>
+</div>
+
+<div id="current-time">--:--:--</div>
+
+<div id="period-display">
+<div id="current-period-name">Loading Schedule...</div>
+<div id="status-message"></div>
+</div>
+
+<div id="time-left">--:--:--</div>
+
+<script>
+// --- 1. SCHEDULE DEFINITIONS ---
+
+function getNormalSchedule() {
+return {
+schedule: [
+{ duration: 46 * 60, name: "P1" }, { duration: 4 * 60, name: "Break 1-2" },
+{ duration: 46 * 60, name: "P2" }, { duration: 4 * 60, name: "Break 2-3" },
+{ duration: 46 * 60, name: "P3" }, { duration: 4 * 60, name: "Break 3-4" },
+{ duration: 30 * 60, name: "P4A (a)" }, { duration: 5 * 60, name: "Break a-b" },
+{ duration: 30 * 60, name: "P4B (b)" }, { duration: 5 * 60, name: "Break b-c" },
+{ duration: 30 * 60, name: "P4C (c)" }, { duration: 4 * 60, name: "Break 4-5" },
+{ duration: 46 * 60, name: "P5" }, { duration: 4 * 60, name: "Break 5-6" },
+{ duration: 46 * 60, name: "P6" }, { duration: 4 * 60, name: "Break 6-7" },
+{ duration: 46 * 60, name: "P7" }, { duration: 4 * 60, name: "Break 7-8" },
+{ duration: 46 * 60, name: "P8" }
+],
+startHour: 8, startMinute: 30,
+endHour: 16, endMinute: 0
+};
+}
+
+const MIDTERM_SCHEDULES = {
+"12/17": {
+startHour: 8, startMinute: 30, endHour: 12, endMinute: 30, dayName: "Wednesday",
+schedule: [
+{ duration: 100 * 60, name: "6th Period" },
+{ duration: 5 * 60, name: "Break 6-3" },
+{ duration: 10 * 60, name: "3rd Period" },
+{ duration: 5 * 60, name: "Break 3-7" },
+{ duration: 90 * 60, name: "7th Period" },
+{ duration: 30 * 60, name: "Lunch" }
+]
+},
+"12/18": {
+startHour: 8, startMinute: 30, endHour: 12, endMinute: 30, dayName: "Thursday",
+schedule: [
+{ duration: 65 * 60, name: "1st Period" },
+{ duration: 5 * 60, name: "Break 1-3" },
+{ duration: 10 * 60, name: "3rd Period" },
+{ duration: 5 * 60, name: "Break 3-4" },
+{ duration: 60 * 60, name: "4th Period" },
+{ duration: 5 * 60, name: "Break 4-8" },
+{ duration: 60 * 60, name: "8th Period" },
+{ duration: 30 * 60, name: "Lunch" }
+]
+}
+};
+
+// --- 2. CONFIGURATION & STATE ---
+let currentScheduleData = null;
+let timerInterval = null;
+
+const NORMAL_SIGNAL_START_MINUTE = 26;
+const NORMAL_SIGNAL_END_HOUR = 16;
+const NORMAL_SIGNAL_END_MINUTE = 5;
+
+// --- 3. HELPER FUNCTIONS ---
+
+function formatTime(totalSeconds) {
+const absSeconds = Math.abs(totalSeconds);
+const sign = totalSeconds < 0 ? "-" : "";
+const hours = Math.floor(absSeconds / 3600);
+const minutes = Math.floor((absSeconds % 3600) / 60);
+const seconds = Math.floor(absSeconds % 60);
+
+const parts = [];
+if (hours > 0) { parts.push(hours); parts.push(minutes.toString().padStart(2, '0')); }
+else { parts.push(minutes); }
+parts.push(seconds.toString().padStart(2, '0'));
+return sign + parts.join(':');
+}
+
+function formatCurrentTime(date) {
+let h = date.getHours();
+const m = date.getMinutes().toString().padStart(2, '0');
+const s = date.getSeconds().toString().padStart(2, '0');
+const ampm = h >= 12 ? 'PM' : 'AM';
+h = h % 12;
+h = h ? h : 12;
+return `${h}:${m}:${s} ${ampm}`;
+}
+
+function formatTime12h(date) {
+let h = date.getHours();
+const m = date.getMinutes().toString().padStart(2, '0');
+const ampm = h >= 12 ? 'PM' : 'AM';
+h = h % 12;
+h = h ? h : 12;
+return `${h}:${m} ${ampm}`;
+}
+
+// --- 4. SCHEDULE LOADER ---
+
+function loadSchedule(now) {
+const selector = document.getElementById('schedule-select');
+const selectedType = selector.value;
+const todayKey = `${now.getMonth() + 1}/${now.getDate()}`;
+
+let config;
+let targetDate = now;
+let dayKey = todayKey;
+
+// 1. Determine which schedule configuration to use
+if (selectedType === 'midterm') {
+
+// Determine which Midterm day's schedule to load
+if (MIDTERM_SCHEDULES[todayKey]) {
+// Today is a Midterm Day (12/17 or 12/18) - RUN ACTIVE SCHEDULE
+dayKey = todayKey;
+config = MIDTERM_SCHEDULES[dayKey];
+config.previewMode = false;
+} else if (MIDTERM_SCHEDULES["12/17"]) {
+// Today is NOT a Midterm Day - SHOW 12/17 AS PREVIEW
+dayKey = "12/17";
+config = MIDTERM_SCHEDULES[dayKey];
+config.previewMode = true;
+} else {
+// Midterm is over, fall back to Normal (shouldn't happen with current dates)
+selector.value = 'normal';
+config = getNormalSchedule();
+}
+
+} else {
+// RUNNING Normal Schedule
+config = getNormalSchedule();
+config.previewMode = false;
+}
+
+// --- Set up Schedule Times (uses current time of day for all calculations) ---
+config.actualStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), config.startHour, config.startMinute, 0);
+config.actualEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), config.endHour, config.endMinute, 0);
+
+// Set the signal times
+if (selectedType === 'midterm' && !config.previewMode) {
+// Midterm signals for the active day
+config.signalStart = new Date(config.actualStart.getTime() - (4 * 60 * 1000));
+config.signalEnd = new Date(config.actualEnd.getTime() + (5 * 60 * 1000));
+} else {
+// Normal Schedule Signals or Midterm Preview Signals
+config.signalStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), config.startHour, NORMAL_SIGNAL_START_MINUTE, 0);
+config.signalEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), NORMAL_SIGNAL_END_HOUR, NORMAL_SIGNAL_END_MINUTE, 0);
+}
+
+currentScheduleData = config;
+}
+
+// --- 5. MAIN UPDATE LOGIC ---
+
+function updateTimer() {
+const now = new Date();
+
+loadSchedule(now);
+
+document.getElementById('current-time').textContent = formatCurrentTime(now);
+
+const config = currentScheduleData;
+const currentDay = now.getDay();
+
+let statusEl = document.getElementById('status-message');
+let periodNameEl = document.getElementById('current-period-name');
+let timeLeftEl = document.getElementById('time-left');
+
+// --- Handle Weekend / OFF-HOURS ---
+if (currentDay === 0 || currentDay === 6) {
+periodNameEl.textContent = "WEEKEND";
+statusEl.textContent = "Waiting for Monday...";
+timeLeftEl.textContent = "00:00";
+document.title = "Timer: WEEKEND";
+return;
+}
+
+// --- Check Schedule Boundaries for selected schedule ---
+
+if (now < config.actualStart) {
+// Before Loop Start
+periodNameEl.textContent = "Pre-Schedule Wait";
+statusEl.textContent = `Schedule starts at ${formatTime12h(config.actualStart)}`;
+
+const timeToStart = Math.ceil((config.actualStart.getTime() - now.getTime()) / 1000);
+timeLeftEl.textContent = formatTime(timeToStart);
+document.title = `Timer: Starts in ${formatTime(timeToStart)}`;
+return;
+}
+
+if (now >= config.actualEnd) {
+// After Loop End
+periodNameEl.textContent = "Schedule Finished";
+
+if (now < config.signalEnd) {
+statusEl.textContent = `Restart signal at ${formatTime12h(config.signalEnd)}`;
+} else {
+statusEl.textContent = "Schedule finished for the day. Restarting tomorrow.";
+}
+
+timeLeftEl.textContent = "00:00";
+document.title = "Timer: Finished";
+return;
+}
+
+// --- Currently within the Core Loop ---
+const timeElapsedInLoop = Math.floor((now.getTime() - config.actualStart.getTime()) / 1000);
+
+let accumulatedDuration = 0;
+let currentStepIndex = -1;
+
+for (let i = 0; i < config.schedule.length; i++) {
+const stepDuration = config.schedule[i].duration;
+
+if (timeElapsedInLoop < accumulatedDuration + stepDuration) {
+currentStepIndex = i;
+break;
+}
+accumulatedDuration += stepDuration;
+}
+
+if (currentStepIndex !== -1) {
+const currentStep = config.schedule[currentStepIndex];
+const timeInStep = timeElapsedInLoop - accumulatedDuration;
+const timeLeftInStep = currentStep.duration - timeInStep;
+
+const stepEndTime = new Date(now.getTime() + timeLeftInStep * 1000);
+
+// Update display elements
+// Add the preview label only if we are displaying a non-active midterm schedule
+const scheduleLabel = config.previewMode ? `(${config.dayName} Preview)` : '';
+
+periodNameEl.textContent = `${currentStep.name} ${scheduleLabel}`;
+
+statusEl.textContent = `${currentStep.name.includes("Break") || currentStep.name === "Lunch" ? currentStep.name : "Period"} ends at ${formatTime12h(stepEndTime)}`;
+timeLeftEl.textContent = formatTime(timeLeftInStep);
+
+// Update the tab title
+document.title = `${formatTime(timeLeftInStep)} left in ${currentStep.name}`;
+
+} else {
+periodNameEl.textContent = "ERROR or Schedule Mismatch";
+statusEl.textContent = "Check configuration and current time.";
+timeLeftEl.textContent = "00:00";
+}
+}
+
+function restartTimer() {
+if (timerInterval) {
+clearInterval(timerInterval);
+}
+timerInterval = setInterval(updateTimer, 100);
+updateTimer();
+}
+
+// --- 6. INITIALIZATION AND EVENT LISTENER ---
+
+document.addEventListener('DOMContentLoaded', () => {
+const selector = document.getElementById('schedule-select');
+selector.addEventListener('change', restartTimer);
+
+restartTimer();
+});
+</script>
+</body>
+</html>
