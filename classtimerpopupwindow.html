@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scheduled Timer - PiP Edition</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+        }
+        #schedule-selector { margin-bottom: 20px; font-size: 1.2em; }
+        select {
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: 1px solid #61dafb;
+            background-color: #383c44;
+            color: white;
+            cursor: pointer;
+        }
+        /* Style for the PiP Trigger Button */
+        #pipButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #61dafb;
+            color: #282c34;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #current-time { font-size: 4em; font-weight: bold; }
+        #time-left { font-size: 3em; color: #61dafb; }
+        
+        /* Hidden elements used for PiP processing */
+        #clockCanvas { display: none; }
+        #videoElement { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="schedule-selector">
+        <label for="schedule-select">Select Schedule:</label>
+        <select id="schedule-select">
+            <option value="normal">Normal Sche.</option>
+            <option value="midterm">Midterm Sche. (12/17 & 12/18)</option>
+        </select>
+    </div>
+
+    <div id="current-time">--:--:--</div>
+    <div id="period-display">
+        <div id="current-period-name">Loading Schedule...</div>
+        <div id="status-message"></div>
+    </div>
+    <div id="time-left">--:--:--</div>
+
+    <button id="pipButton">✨ Open Floating Overlay</button>
+
+    <canvas id="clockCanvas" width="400" height="200"></canvas>
+    <video id="videoElement" autoplay muted hidden></video>
+
+    <script>
+        // --- DATA & LOGIC FROM YOUR ORIGINAL CODE ---
+        function getNormalSchedule() {
+            return {
+                schedule: [
+                    { duration: 46 * 60, name: "P1" }, { duration: 4 * 60, name: "Break 1-2" },
+                    { duration: 46 * 60, name: "P2" }, { duration: 4 * 60, name: "Break 2-3" },
+                    { duration: 46 * 60, name: "P3" }, { duration: 4 * 60, name: "Break 3-4" },
+                    { duration: 30 * 60, name: "P4A (a)" }, { duration: 5 * 60, name: "Break a-b" },
+                    { duration: 30 * 60, name: "P4B (b)" }, { duration: 5 * 60, name: "Break b-c" },
+                    { duration: 30 * 60, name: "P4C (c)" }, { duration: 4 * 60, name: "Break 4-5" },
+                    { duration: 46 * 60, name: "P5" }, { duration: 4 * 60, name: "Break 5-6" },
+                    { duration: 46 * 60, name: "P6" }, { duration: 4 * 60, name: "Break 6-7" },
+                    { duration: 46 * 60, name: "P7" }, { duration: 4 * 60, name: "Break 7-8" },
+                    { duration: 46 * 60, name: "P8" }
+                ],
+                startHour: 8, startMinute: 30, endHour: 16, endMinute: 0
+            };
+        }
+
+        const MIDTERM_SCHEDULES = {
+            "12/17": { startHour: 8, startMinute: 30, endHour: 12, endMinute: 30, dayName: "Wednesday", schedule: [{ duration: 100 * 60, name: "6th Period" }, { duration: 5 * 60, name: "Break 6-3" }, { duration: 10 * 60, name: "3rd Period" }, { duration: 5 * 60, name: "Break 3-7" }, { duration: 90 * 60, name: "7th Period" }, { duration: 30 * 60, name: "Lunch" }] },
+            "12/18": { startHour: 8, startMinute: 30, endHour: 12, endMinute: 30, dayName: "Thursday", schedule: [{ duration: 65 * 60, name: "1st Period" }, { duration: 5 * 60, name: "Break 1-3" }, { duration: 10 * 60, name: "3rd Period" }, { duration: 5 * 60, name: "Break 3-4" }, { duration: 60 * 60, name: "4th Period" }, { duration: 5 * 60, name: "Break 4-8" }, { duration: 60 * 60, name: "8th Period" }, { duration: 30 * 60, name: "Lunch" }] }
+        };
+
+        let currentScheduleData = null;
+        let timerInterval = null;
+        const canvas = document.getElementById('clockCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('videoElement');
+
+        function formatTime(totalSeconds) {
+            const absSeconds = Math.abs(totalSeconds);
+            const minutes = Math.floor((absSeconds % 3600) / 60);
+            const seconds = Math.floor(absSeconds % 60);
+            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function formatCurrentTime(date) {
+            let h = date.getHours() % 12 || 12;
+            return `${h}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+        }
+
+        function loadSchedule(now) {
+            const selectedType = document.getElementById('schedule-select').value;
+            const todayKey = `${now.getMonth() + 1}/${now.getDate()}`;
+            let config = selectedType === 'midterm' ? (MIDTERM_SCHEDULES[todayKey] || MIDTERM_SCHEDULES["12/17"]) : getNormalSchedule();
+            config.actualStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), config.startHour, config.startMinute, 0);
+            config.actualEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), config.endHour, config.endMinute, 0);
+            currentScheduleData = config;
+        }
+
+        // --- PIP DRAWING LOGIC ---
+        function updateDisplay() {
+            const now = new Date();
+            loadSchedule(now);
+            
+            let pName = "OFF";
+            let tLeft = "00:00";
+            const config = currentScheduleData;
+
+            // Logic to determine Period Name and Time Left
+            if (now < config.actualStart) {
+                pName = "Waiting...";
+                tLeft = formatTime(Math.ceil((config.actualStart - now)/1000));
+            } else if (now >= config.actualEnd) {
+                pName = "Done";
+                tLeft = "00:00";
+            } else {
+                const elapsed = Math.floor((now - config.actualStart) / 1000);
+                let acc = 0;
+                for (let step of config.schedule) {
+                    if (elapsed < acc + step.duration) {
+                        pName = step.name;
+                        tLeft = formatTime(step.duration - (elapsed - acc));
+                        break;
+                    }
+                    acc += step.duration;
+                }
+            }
+
+            // Update Page
+            document.getElementById('current-time').textContent = formatCurrentTime(now);
+            document.getElementById('current-period-name').textContent = pName;
+            document.getElementById('time-left').textContent = tLeft;
+
+            // Update Canvas (The PiP Window)
+            ctx.fillStyle = "#282c34";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.textAlign = "center";
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText(pName, canvas.width/2, 40);
+            
+            ctx.fillStyle = "#61dafb";
+            ctx.font = "bold 70px Arial";
+            ctx.fillText(tLeft, canvas.width/2, 120);
+
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.font = "18px Arial";
+            ctx.fillText(formatCurrentTime(now), canvas.width/2, 170);
+        }
+
+        // Setup PiP Stream
+        const stream = canvas.captureStream(10);
+        video.srcObject = stream;
+
+        document.getElementById('pipButton').addEventListener('click', async () => {
+            try {
+                await video.play();
+                await video.requestPictureInPicture();
+            } catch (err) { console.error(err); }
+        });
+
+        setInterval(updateDisplay, 1000);
+        updateDisplay();
+    </script>
+</body>
+</html>
