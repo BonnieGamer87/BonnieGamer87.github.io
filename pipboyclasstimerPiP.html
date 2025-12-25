@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pip-Boy 3000 Mk IV</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+
+        :root {
+            --pip-green: #1aff80;
+            --pip-green-dim: rgba(26, 255, 128, 0.2);
+            --pip-bg: #050a05;
+            --case-color: #2c2c24;
+        }
+
+        body {
+            font-family: 'Courier Prime', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #1a1a1a;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        .pipboy-frame {
+            width: 95vw;
+            max-width: 800px; 
+            height: 90vh;
+            background: var(--case-color);
+            border: 15px solid #3d3d32;
+            border-radius: 40px;
+            position: relative;
+            padding: 20px;
+            box-shadow: inset 0 0 50px #000, 10px 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            background-color: var(--pip-bg);
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 4px solid #111;
+            box-shadow: inset 0 0 100px rgba(26, 255, 128, 0.15);
+        }
+
+        /* SCANLINES FOR THE MAIN SCREEN */
+        .screen::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        radial-gradient(circle, transparent 40%, black 150%);
+            z-index: 20;
+            background-size: 100% 3px, 100% 100%;
+            pointer-events: none;
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: center; 
+            gap: 25px;
+            padding: 20px 10px 10px 10px;
+            z-index: 15;
+            flex-shrink: 0;
+            border-bottom: 2px solid var(--pip-green-dim);
+        }
+
+        .nav-button {
+            background: none;
+            border: none;
+            color: var(--pip-green);
+            font-family: 'Courier Prime', monospace;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.4;
+            transition: 0.2s;
+            padding-bottom: 5px;
+            border-bottom: 3px solid transparent;
+        }
+
+        .nav-button.active {
+            opacity: 1;
+            text-shadow: 0 0 10px var(--pip-green);
+            border-bottom: 3px solid var(--pip-green);
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+            color: var(--pip-green);
+            z-index: 5;
+            animation: flicker 0.05s infinite alternate;
+            padding: 10px 20px;
+            overflow: hidden; 
+        }
+
+        .tab-content.active { display: flex; }
+
+        #tab-schedule {
+            justify-content: flex-start;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+
+        .schedule-list {
+            width: 100%;
+            max-width: 700px;
+            height: 95%; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 1.15em; 
+        }
+
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 15px; 
+            border-bottom: 1px solid var(--pip-green-dim);
+            flex-grow: 1;
+        }
+
+        .schedule-item:last-child {
+            border-bottom: none;
+        }
+
+        .schedule-item.active-now {
+            background: var(--pip-green);
+            color: var(--pip-bg);
+            font-weight: bold;
+            box-shadow: 0 0 15px var(--pip-green);
+        }
+
+        #tab-timer { justify-content: center; position: relative; }
+        #current-time { font-size: 4.5em; font-weight: bold; text-shadow: 0 0 15px var(--pip-green); }
+        #period-display { margin: 20px 0; padding: 20px; width: 85%; border: 2px solid var(--pip-green); background: var(--pip-green-dim); text-align: center; }
+        #time-left { font-size: 4em; text-shadow: 0 0 10px var(--pip-green); }
+
+        #pipButton {
+            margin-top: 15px;
+            background: var(--pip-green-dim);
+            color: var(--pip-green);
+            border: 1px solid var(--pip-green);
+            padding: 5px 15px;
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.8em;
+            cursor: pointer;
+            z-index: 30;
+            text-shadow: 0 0 5px var(--pip-green);
+        }
+        #pipButton:hover { background: var(--pip-green); color: var(--pip-bg); }
+
+        .calendar-container { width: 100%; max-width: 550px; margin-top: 10px; }
+        .calendar-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .cal-btn { background: var(--pip-green-dim); border: 1px solid var(--pip-green); color: var(--pip-green); padding: 5px 15px; cursor: pointer; font-family: 'Courier Prime'; }
+        #calendar-header { font-size: 1.8em; font-weight: bold; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; }
+        .day-name { font-weight: bold; border-bottom: 1px solid var(--pip-green); }
+        .calendar-day { padding: 12px 0; font-size: 1.2em; }
+        .calendar-day.today { background: var(--pip-green); color: var(--pip-bg); font-weight: bold; }
+
+        #clockCanvas, #videoElement { display: none; }
+
+        @keyframes flicker { 0% { opacity: 0.97; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="pipboy-frame">
+        <div class="screen">
+            <nav class="nav-bar">
+                <button class="nav-button" onclick="showTab('schedule', event)">Time Schedule</button>
+                <button class="nav-button active" onclick="showTab('timer', event)">Class Timer</button>
+                <button class="nav-button" onclick="showTab('calendar', event)">Calendar</button>
+            </nav>
+
+            <div id="tab-schedule" class="tab-content">
+                <div class="schedule-list" id="schedule-list-container"></div>
+            </div>
+
+            <div id="tab-timer" class="tab-content active">
+                <div id="current-time">--:--:--</div>
+                <div id="period-display">
+                    <div id="current-period-name" style="font-size: 1.8em;">BOOTING...</div>
+                </div>
+                <div id="time-left">--:--</div>
+                <button id="pipButton">ENABLE OVERLAY</button>
+            </div>
+
+            <div id="tab-calendar" class="tab-content">
+                <div class="calendar-container">
+                    <div class="calendar-controls">
+                        <button class="cal-btn" onclick="changeMonth(-1)">PREV</button>
+                        <div id="calendar-header">MONTH YEAR</div>
+                        <button class="cal-btn" onclick="changeMonth(1)">NEXT</button>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="clockCanvas" width="400" height="200"></canvas>
+    <video id="videoElement" autoplay muted hidden></video>
+
+    <script>
+        const CONFIG = {
+            startHour: 8, startMinute: 30,
+            schedule: [
+                { duration: 46 * 60, name: "Period 1st" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 2nd" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 3rd" }, { duration: 4 * 60, isBreak: true },
+                { duration: 30 * 60, name: "Period 4th A Lunch" }, { duration: 5 * 60, isBreak: true },
+                { duration: 30 * 60, name: "Period 4th B Lunch" }, { duration: 5 * 60, isBreak: true },
+                { duration: 30 * 60, name: "Period 4th C Lunch" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 5th" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 6th" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 7th" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 8th" }
+            ]
+        };
+
+        let viewDate = new Date();
+        const canvas = document.getElementById('clockCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('videoElement');
+
+        function showTab(tabId, event) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            if(event) event.currentTarget.classList.add('active');
+            if(tabId === 'calendar') renderCalendar();
+            if(tabId === 'schedule') renderSchedule();
+        }
+
+        function formatTime12(date) {
+            let h = date.getHours();
+            const m = date.getMinutes().toString().padStart(2, '0');
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            return `${h % 12 || 12}:${m} ${ampm}`;
+        }
+
+        function renderSchedule() {
+            const container = document.getElementById('schedule-list-container');
+            container.innerHTML = '';
+            let currentTime = new Date();
+            currentTime.setHours(CONFIG.startHour, CONFIG.startMinute, 0);
+            const now = new Date();
+            CONFIG.schedule.forEach(item => {
+                let startTime = new Date(currentTime);
+                currentTime.setSeconds(currentTime.getSeconds() + item.duration);
+                let endTime = new Date(currentTime);
+                if (!item.isBreak) {
+                    const el = document.createElement('div');
+                    el.className = 'schedule-item';
+                    if (now >= startTime && now < endTime) el.className += ' active-now';
+                    el.innerHTML = `<span>${item.name}</span><span>${formatTime12(startTime)} - ${formatTime12(endTime)}</span>`;
+                    container.appendChild(el);
+                }
+            });
+        }
+
+        function changeMonth(dir) {
+            viewDate.setMonth(viewDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const header = document.getElementById('calendar-header');
+            const today = new Date();
+            header.textContent = `${viewDate.toLocaleString('default', { month: 'long' })} ${viewDate.getFullYear()}`;
+            grid.innerHTML = '';
+            ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].forEach(d => {
+                const el = document.createElement('div'); el.className = 'day-name'; el.textContent = d; grid.appendChild(el);
+            });
+            const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+            for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+            for (let day = 1; day <= daysInMonth; day++) {
+                const el = document.createElement('div'); el.className = 'calendar-day';
+                if (day === today.getDate() && viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear()) el.className += ' today';
+                el.textContent = day; grid.appendChild(el);
+            }
+        }
+
+        function updateTimer() {
+            const now = new Date();
+            const h = now.getHours() % 12 || 12;
+            const m = now.getMinutes().toString().padStart(2, '0');
+            const s = now.getSeconds().toString().padStart(2, '0');
+            const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+            const timeString = `${h}:${m}:${s} ${ampm}`;
+            document.getElementById('current-time').textContent = timeString;
+
+            let startTime = new Date(now);
+            startTime.setHours(CONFIG.startHour, CONFIG.startMinute, 0);
+            let pName = "END OF DAY";
+            let tLeft = "00:00";
+            let acc = 0;
+            let diff = (now - startTime) / 1000;
+
+            if (diff < 0) {
+                pName = "PRE-SCHEDULE";
+                tLeft = Math.ceil(Math.abs(diff/60)) + "M";
+            } else {
+                for (let item of CONFIG.schedule) {
+                    if (diff < acc + item.duration) {
+                        const rem = (acc + item.duration) - diff;
+                        pName = item.isBreak ? "PASSING PERIOD" : item.name;
+                        tLeft = `${Math.floor(rem/60)}:${Math.floor(rem%60).toString().padStart(2,'0')}`;
+                        break;
+                    }
+                    acc += item.duration;
+                }
+            }
+
+            document.getElementById('current-period-name').textContent = pName;
+            document.getElementById('time-left').textContent = tLeft;
+
+            // DRAW PIP OVERLAY WITH CRT SCANLINES & GLOW
+            ctx.shadowBlur = 0; // Reset for background
+            ctx.fillStyle = "#050a05";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // DRAW SCANLINES
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.height; i += 3) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // DRAW VIGNETTE (Radial Shadow)
+            const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 50, canvas.width/2, canvas.height/2, 200);
+            gradient.addColorStop(0, "rgba(0,0,0,0)");
+            gradient.addColorStop(1, "rgba(0,0,0,0.8)");
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // DRAW TEXT WITH GLOW
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#1aff80";
+            ctx.shadowColor = "#1aff80";
+            ctx.shadowBlur = 12;
+            
+            ctx.font = "bold 22px 'Courier Prime'";
+            ctx.fillText(pName, canvas.width/2, 50);
+            ctx.font = "bold 80px 'Courier Prime'";
+            ctx.fillText(tLeft, canvas.width/2, 130);
+            
+            ctx.shadowBlur = 4;
+            ctx.font = "16px 'Courier Prime'";
+            ctx.fillText(timeString, canvas.width/2, 180);
+        }
+
+        const stream = canvas.captureStream(10);
+        video.srcObject = stream;
+        document.getElementById('pipButton').addEventListener('click', async () => {
+            try { await video.play(); await video.requestPictureInPicture(); } catch (err) {}
+        });
+
+        setInterval(updateTimer, 1000);
+        updateTimer();
+        renderCalendar();
+    </script>
+</body>
+</html>
