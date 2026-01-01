@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overwatch Account Countdown</title>
+    <style>
+        body { background: #111; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        canvas { border-radius: 12px; box-shadow: 0 0 40px rgba(249, 158, 26, 0.3); background: #000; }
+        .controls { margin-top: 30px; }
+        button { padding: 16px 32px; font-size: 18px; cursor: pointer; background: #f99e1a; border: none; color: black; border-radius: 4px; font-weight: bold; text-transform: uppercase; }
+        button:hover { background: #ffb84d; }
+    </style>
+</head>
+<body>
+
+    <canvas id="timerCanvas" width="400" height="200"></canvas>
+    <video id="pipVideo" autoplay muted style="display:none;"></video>
+
+    <div class="controls">
+        <button id="pipButton">Start PiP Countdown</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('timerCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('pipVideo');
+        const pipButton = document.getElementById('pipButton');
+
+        // Target Date: 2026-01-09 07:58 UTC -> 01:58 AM Central
+        const targetDate = new Date("2026-01-09T01:58:00-06:00").getTime();
+
+        function updateTimer() {
+            const now = new Date().getTime();
+            const diff = targetDate - now;
+
+            // Black Background for the PiP window
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (diff <= 0) {
+                drawText("ACCOUNT FREE!", 200, 105, "38px", "#f99e1a");
+            } else {
+                const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                const timeStr = `${d}d ${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+
+                // Requested Title
+                drawText("TIME WHEN OVERWATCH ACCOUNT IS FREE", 200, 50, "13px", "#f99e1a");
+                
+                // Countdown Numbers
+                drawText(timeStr, 200, 115, "42px", "#ffffff");
+                
+                // Location/Zone Label
+                drawText("CENTRAL TIME (CST)", 200, 165, "12px", "#666");
+            }
+
+            requestAnimationFrame(updateTimer);
+        }
+
+        function drawText(text, x, y, size, color) {
+            ctx.fillStyle = color;
+            ctx.font = `bold ${size} 'Segoe UI', Arial`;
+            ctx.textAlign = "center";
+            ctx.fillText(text, x, y);
+        }
+
+        const stream = canvas.captureStream(30);
+        video.srcObject = stream;
+
+        pipButton.addEventListener('click', async () => {
+            try {
+                if (document.pictureInPictureElement) {
+                    await document.exitPictureInPicture();
+                } else {
+                    await video.play();
+                    await video.requestPictureInPicture();
+                }
+            } catch (e) { alert("Please use a browser that supports Picture-in-Picture."); } 
+        });
+
+        updateTimer();
+    </script>
+</body>
+</html>
