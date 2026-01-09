@@ -8,6 +8,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
 
         :root {
+            /* NEW CUSTOM GREEN */
             --pip-green: #26ff40; 
             --pip-green-dim: rgba(38, 255, 64, 0.2);
             --pip-bg: #050a05;
@@ -134,6 +135,10 @@
             flex-grow: 1;
         }
 
+        .schedule-item:last-child {
+            border-bottom: none;
+        }
+
         .schedule-item.active-now {
             background: var(--pip-green);
             color: var(--pip-bg);
@@ -158,6 +163,19 @@
             z-index: 30;
             text-shadow: 0 0 5px var(--pip-green);
         }
+        #pipButton:hover { background: var(--pip-green); color: var(--pip-bg); }
+
+        .calendar-container { width: 100%; max-width: 550px; margin-top: 10px; }
+        .calendar-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .cal-btn { background: var(--pip-green-dim); border: 1px solid var(--pip-green); color: var(--pip-green); padding: 5px 15px; cursor: pointer; font-family: 'Courier Prime'; }
+        #calendar-header { font-size: 1.8em; font-weight: bold; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center; }
+        .day-name { font-weight: bold; border-bottom: 1px solid var(--pip-green); }
+        .calendar-day { padding: 12px 0; font-size: 1.2em; }
+        .calendar-day.today { background: var(--pip-green); color: var(--pip-bg); font-weight: bold; }
+
+        #clockCanvas { display: none; width: 400px; height: 400px; }
+        #videoElement { display: none; }
 
         @keyframes flicker { 0% { opacity: 0.97; } 100% { opacity: 1; } }
     </style>
@@ -186,32 +204,39 @@
             </div>
 
             <div id="tab-calendar" class="tab-content">
-                <div id="calendar-header" style="font-size: 2em; margin-top: 50px;">CALENDAR MODULE</div>
-                <p>Awaiting Data...</p>
+                <div class="calendar-container">
+                    <div class="calendar-controls">
+                        <button class="cal-btn" onclick="changeMonth(-1)">PREV</button>
+                        <div id="calendar-header">MONTH YEAR</div>
+                        <button class="cal-btn" onclick="changeMonth(1)">NEXT</button>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <canvas id="clockCanvas" width="400" height="400" style="display:none;"></canvas>
+    <canvas id="clockCanvas" width="400" height="400"></canvas>
     <video id="videoElement" autoplay muted hidden></video>
 
     <script>
         const CONFIG = {
             startHour: 8, startMinute: 30,
             schedule: [
-                { duration: 46 * 60, name: "1st Period" }, { duration: 4 * 60, isBreak: true },
-                { duration: 46 * 60, name: "2nd Period" }, { duration: 4 * 60, isBreak: true },
-                { duration: 46 * 60, name: "3rd Period" }, { duration: 4 * 60, isBreak: true },
-                { duration: 30 * 60, name: "4th Period A Lunch" }, { duration: 5 * 60, isBreak: true },
-                { duration: 30 * 60, name: "4th Period B Lunch" }, { duration: 5 * 60, isBreak: true },
-                { duration: 30 * 60, name: "4th Period C Lunch" }, { duration: 4 * 60, isBreak: true },
-                { duration: 46 * 60, name: "5th Period" }, { duration: 4 * 60, isBreak: true },
-                { duration: 46 * 60, name: "6th Period" }, { duration: 4 * 60, isBreak: true },
-                { duration: 46 * 60, name: "7th Period" }, { duration: 4 * 60, isBreak: true },
-                { duration: 46 * 60, name: "8th Period" }
+                { duration: 46 * 60, name: "Period 1st" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 2nd" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 3rd" }, { duration: 4 * 60, isBreak: true },
+                { duration: 30 * 60, name: "Period 4th A Lunch" }, { duration: 5 * 60, isBreak: true },
+                { duration: 30 * 60, name: "Period 4th B Lunch" }, { duration: 5 * 60, isBreak: true },
+                { duration: 30 * 60, name: "Period 4th C Lunch" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 5th" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 6th" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 7th" }, { duration: 4 * 60, isBreak: true },
+                { duration: 46 * 60, name: "Period 8th" }
             ]
         };
 
+        let viewDate = new Date();
         const canvas = document.getElementById('clockCanvas');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('videoElement');
@@ -221,6 +246,8 @@
             document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-' + tabId).classList.add('active');
             if(event) event.currentTarget.classList.add('active');
+            if(tabId === 'calendar') renderCalendar();
+            if(tabId === 'schedule') renderSchedule();
         }
 
         function formatTime12(date) {
@@ -250,34 +277,71 @@
             });
         }
 
+        function changeMonth(dir) {
+            viewDate.setMonth(viewDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const header = document.getElementById('calendar-header');
+            const today = new Date();
+            header.textContent = `${viewDate.toLocaleString('default', { month: 'long' })} ${viewDate.getFullYear()}`;
+            grid.innerHTML = '';
+            ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].forEach(d => {
+                const el = document.createElement('div'); el.className = 'day-name'; el.textContent = d; grid.appendChild(el);
+            });
+            const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1).getDay();
+            const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+            for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+            for (let day = 1; day <= daysInMonth; day++) {
+                const el = document.createElement('div'); el.className = 'calendar-day';
+                if (day === today.getDate() && viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear()) el.className += ' today';
+                el.textContent = day; grid.appendChild(el);
+            }
+        }
+
         function updateTimer() {
             const now = new Date();
             const h = now.getHours() % 12 || 12;
             const m = now.getMinutes().toString().padStart(2, '0');
             const s = now.getSeconds().toString().padStart(2, '0');
             const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
-            document.getElementById('current-time').textContent = `${h}:${m}:${s} ${ampm}`;
+            const timeString = `${h}:${m}:${s} ${ampm}`;
+            document.getElementById('current-time').textContent = timeString;
 
             let startTime = new Date(now);
             startTime.setHours(CONFIG.startHour, CONFIG.startMinute, 0);
-            let pName = "OFF DUTY";
+            let pName = "END OF DAY";
             let tLeft = "00:00";
             let acc = 0;
             let diff = (now - startTime) / 1000;
 
             if (diff < 0) {
-                pName = "PRE-START";
-                tLeft = Math.floor(Math.abs(diff) / 60) + "M";
+                pName = "PRE-SCHEDULE";
+                const totalSeconds = Math.abs(diff);
+                const minutes = Math.floor(totalSeconds / 60);
+                if (minutes >= 60) {
+                    const hrs = Math.floor(minutes / 60);
+                    const mins = minutes % 60;
+                    tLeft = `${hrs}:${mins.toString().padStart(2,'0')}`;
+                } else {
+                    tLeft = `${minutes}m`;
+                }
             } else {
                 for (let item of CONFIG.schedule) {
                     if (diff < acc + item.duration) {
                         const rem = (acc + item.duration) - diff;
-                        // Logic updated to show "3rd Period" instead of "Period 3rd"
-                        pName = item.isBreak ? "PASSING" : item.name;
-                        
-                        const mins = Math.floor(rem / 60);
-                        const secs = Math.floor(rem % 60);
-                        tLeft = `${mins}:${secs.toString().padStart(2, '0')}`;
+                        pName = item.isBreak ? "PASS" : item.name.replace("Period ", "P");
+                        const totalMins = Math.floor(rem / 60);
+                        const totalSecs = Math.floor(rem % 60);
+                        if (totalMins >= 60) {
+                            const hrs = Math.floor(totalMins / 60);
+                            const mins = totalMins % 60;
+                            tLeft = `${hrs}:${mins.toString().padStart(2, '0')}`;
+                        } else {
+                            tLeft = `${totalMins}:${totalSecs.toString().padStart(2, '0')}`;
+                        }
                         break;
                     }
                     acc += item.duration;
@@ -287,35 +351,37 @@
             document.getElementById('current-period-name').textContent = pName;
             document.getElementById('time-left').textContent = tLeft;
 
-            // DRAW PIP OVERLAY
+            // HIGH RESOLUTION CANVAS DRAWING
             ctx.clearRect(0, 0, 400, 400);
             ctx.fillStyle = "#050a05"; 
             ctx.fillRect(0, 0, 400, 400);
+            
             ctx.textAlign = "center";
-            ctx.fillStyle = "#26ff40"; 
+            ctx.fillStyle = "#26ff40"; // UPDATED CUSTOM GREEN
             ctx.shadowColor = "#26ff40";
             ctx.shadowBlur = 10;
             
-            ctx.font = "bold 28px 'Courier Prime'";
+            ctx.font = "bold 34px 'Courier Prime'";
             ctx.fillText(pName, 200, 140);
             
             ctx.font = "bold 110px 'Courier Prime'";
             ctx.fillText(tLeft, 200, 280);
         }
 
+        const stream = canvas.captureStream(30);
+        video.srcObject = stream;
         document.getElementById('pipButton').addEventListener('click', async () => {
             try { 
                 await video.play(); 
                 await video.requestPictureInPicture(); 
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error("PiP failed: ", err);
+            }
         });
 
-        const stream = canvas.captureStream(30);
-        video.srcObject = stream;
         setInterval(updateTimer, 1000);
-        setInterval(renderSchedule, 30000);
         updateTimer();
-        renderSchedule();
+        renderCalendar();
     </script>
 </body>
 </html>
