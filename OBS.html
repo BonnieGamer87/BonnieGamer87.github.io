@@ -2,51 +2,22 @@
 <html>
 <head>
     <style>
-        body { 
-            background: #2f2f2f; /* Your requested color */
-            color: white; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0; padding: 12px;
-            display: flex; flex-direction: column; gap: 10px;
-            user-select: none;
-            overflow: hidden;
-        }
-        .label { 
-            font-size: 11px; 
-            color: #aaaaaa; 
-            text-transform: uppercase; 
-            letter-spacing: 1.5px; 
-            margin-bottom: -2px;
-            text-align: center;
-        }
-        button { 
-            width: 100%; padding: 15px 0; font-size: 15px; font-weight: bold; 
-            cursor: pointer; border: none; border-radius: 6px; color: white;
-            transition: filter 0.1s, transform 0.05s;
-        }
-        button:active { transform: translateY(2px); filter: brightness(0.8); }
-        
-        .inc { background: #2ecc71; box-shadow: 0 4px #27ae60; }
-        .dec { background: #e67e22; box-shadow: 0 4px #d35400; }
-        
-        .reset { 
-            background: #4a4a4a; font-size: 11px; padding: 8px 0; 
-            margin-top: 10px; color: #ddd; box-shadow: 0 2px #333;
-        }
-        .reset:hover { background: #5a5a5a; }
+        body { background: #2f2f2f; color: white; font-family: sans-serif; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 15px; font-weight: bold; cursor: pointer; border: none; border-radius: 5px; color: white; }
+        .inc { background: #2ecc71; }
+        .dec { background: #e67e22; }
+        .rst { background: #444; font-size: 10px; }
     </style>
 </head>
 <body>
-    <div class="label">Scoreboard Control</div>
-    <button class="inc" onclick="send('increment_hotkey')">+1 POINT</button>
-    <button class="dec" onclick="send('decrement_hotkey')">-1 POINT</button>
-    
-    <button class="reset" onclick="send('reset_hotkey')">RESET TO 00</button>
+    <button class="inc" onclick="send('htk_inc')">+1 POINT</button>
+    <button class="dec" onclick="send('htk_dec')">-1 ERROR</button>
+    <button class="rst" onclick="send('htk_rst')">RESET</button>
 
     <script>
-        function send(key) {
+        function send(name) {
             if (window.obsstudio && window.obsstudio.sendHotkey) {
-                window.obsstudio.sendHotkey(key);
+                window.obsstudio.sendHotkey(name);
             }
         }
     </script>
