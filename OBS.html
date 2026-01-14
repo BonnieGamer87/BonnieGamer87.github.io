@@ -2,26 +2,52 @@
 <html>
 <head>
     <style>
-        body { background: #2f2f2f; color: white; font-family: sans-serif; display: flex; flex-direction: column; gap: 10px; padding: 10px; }
-        button { 
-            padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer;
-            border: none; border-radius: 5px; color: white;
+        body { 
+            background: #2f2f2f; /* Your requested color */
+            color: white; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0; padding: 12px;
+            display: flex; flex-direction: column; gap: 10px;
+            user-select: none;
+            overflow: hidden;
         }
-        .inc { background: #2ecc71; } /* Green */
-        .inc:active { background: #27ae60; }
-        .reset { background: #e74c3c; } /* Red */
-        .reset:active { background: #c0392b; }
+        .label { 
+            font-size: 11px; 
+            color: #aaaaaa; 
+            text-transform: uppercase; 
+            letter-spacing: 1.5px; 
+            margin-bottom: -2px;
+            text-align: center;
+        }
+        button { 
+            width: 100%; padding: 15px 0; font-size: 15px; font-weight: bold; 
+            cursor: pointer; border: none; border-radius: 6px; color: white;
+            transition: filter 0.1s, transform 0.05s;
+        }
+        button:active { transform: translateY(2px); filter: brightness(0.8); }
+        
+        .inc { background: #2ecc71; box-shadow: 0 4px #27ae60; }
+        .dec { background: #e67e22; box-shadow: 0 4px #d35400; }
+        
+        .reset { 
+            background: #4a4a4a; font-size: 11px; padding: 8px 0; 
+            margin-top: 10px; color: #ddd; box-shadow: 0 2px #333;
+        }
+        .reset:hover { background: #5a5a5a; }
     </style>
 </head>
 <body>
-    <button class="inc" onclick="sendToOBS('increment_hotkey')">SCORE +1</button>
-    <button class="reset" onclick="sendToOBS('reset_hotkey')">RESET (00)</button>
+    <div class="label">Scoreboard Control</div>
+    <button class="inc" onclick="send('increment_hotkey')">+1 POINT</button>
+    <button class="dec" onclick="send('decrement_hotkey')">-1 POINT</button>
+    
+    <button class="reset" onclick="send('reset_hotkey')">RESET TO 00</button>
 
     <script>
-        // This function tells OBS to "press" the script's hotkey internally
-        function sendToOBS(key) {
-            // Note: This works when used as a Custom Dock in OBS
-            window.obsstudio.sendHotkey(key);
+        function send(key) {
+            if (window.obsstudio && window.obsstudio.sendHotkey) {
+                window.obsstudio.sendHotkey(key);
+            }
         }
     </script>
 </body>
