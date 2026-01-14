@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+        button { 
+            padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer;
+            border: none; border-radius: 5px; color: white;
+        }
+        .inc { background: #2ecc71; } /* Green */
+        .inc:active { background: #27ae60; }
+        .reset { background: #e74c3c; } /* Red */
+        .reset:active { background: #c0392b; }
+    </style>
+</head>
+<body>
+    <button class="inc" onclick="sendToOBS('increment_hotkey')">SCORE +1</button>
+    <button class="reset" onclick="sendToOBS('reset_hotkey')">RESET (00)</button>
+
+    <script>
+        // This function tells OBS to "press" the script's hotkey internally
+        function sendToOBS(key) {
+            // Note: This works when used as a Custom Dock in OBS
+            window.obsstudio.sendHotkey(key);
+        }
+    </script>
+</body>
+</html>
