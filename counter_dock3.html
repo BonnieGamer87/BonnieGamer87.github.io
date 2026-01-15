@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; gap: 10px; padding: 10px; }
+        .btn { 
+            background: #444; color: white; border: none; padding: 20px; 
+            cursor: pointer; flex: 1; border-radius: 5px; font-weight: bold; font-size: 16px;
+        }
+        .btn:hover { background: #666; }
+        .btn:active { background: #222; }
+        .reset { background: #d32f2f; }
+    </style>
+</head>
+<body>
+
+    <button class="btn" onclick="sendAction('inc')">ADD +1</button>
+    <button class="btn reset" onclick="sendAction('res')">RESET</button>
+
+    <script>
+        function sendAction(type) {
+            if (window.obsstudio) {
+                // This sends the signal directly to the script settings
+                window.obsstudio.setControlLevel(3); // Allows script control
+                window.obsstudio.send('SetScriptSettings', {
+                    'script': 'counter.lua', // MAKE SURE THIS MATCHES YOUR FILENAME
+                    'settings': { 'trigger_action': type }
+                });
+            } else {
+                alert("This only works inside an OBS Custom Browser Dock!");
+            }
+        }
+    </script>
+</body>
+</html>
