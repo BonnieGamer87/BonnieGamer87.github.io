@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Counter Control</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  background: #181818;
+  color: #eee;
+  padding: 10px;
+  user-select: text;          /* ✅ allow selection */
+}
+
+input {
+  width: 100%;
+  margin: 4px 0;
+  padding: 6px;
+  user-select: text;          /* ✅ allow copy/paste */
+}
+
+button {
+  width: 100%;
+  margin: 4px 0;
+  padding: 6px;
+  cursor: pointer;
+}
+
+#status {
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.connected { color: #4caf50; }
+.error { color: #f44336; }
+
+#connectionPanel {
+  display: none;              /* 🔒 hidden by default */
+  border-top: 1px solid #333;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<h3>Counter</h3>
+
+<button onclick="send('counter_inc')">+1</button>
+<button onclick="send('counter_reset')">Reset</button>
+
+<button onclick="toggleConnection()">Connection ⚙️</button>
+
+<div id="connectionPanel">
+  <input id="ip" value="localhost" placeholder="Server IP">
+  <input id="port" value="4455" placeholder="Port">
+  <input id="password" type="password" placeholder="Password">
+
+  <button onclick="connect()">Connect</button>
+  <div id="status">Not connected</div>
+</div>
+
+<script>
+let socket = null;
+
+function toggleConnection() {
+  const panel = document.getElementById("connectionPanel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+}
+
+function setStatus(text, cls = "") {
+  const s = document.getElementById("status");
+  s.textContent = text;
+  s.className = cls;
+}
+
+function connect() {
+  const ip = document.getElementById("ip").value.trim();
+  const port = document.getElementById("port").value.trim();
+  const password = document.getElementById("password").value;
+  const url = `ws://${ip}:${port}`;
+
+  socket = new WebSocket(url);
+
+  socket.onopen = () => {
+    setStatus("Connected", "connected");
+    authenticate(password);
+  };
+
+  socket.onerror = () => {
+    setStatus("Connection error", "error");
+  };
+}
+
+function authenticate(password) {
+  if (!password) return;
+
+  socket.send(JSON.stringify({
+    op: 1,
+    d: {
+      rpcVersion: 1,
+      authentication: password
+    }
+  }));
+}
+
+function send(hotkeyName) {
+  if (!socket || socket.readyState !== 1) return;
+
+  socket.send(JSON.stringify({
+    op: 6,
+    d: {
+      requestType: "TriggerHotkeyByName",
+      requestId: Date.now().toString(),
+      requestData: { hotkeyName }
+    }
+  }));
+}
+</script>
+
+</body>
+</html>
