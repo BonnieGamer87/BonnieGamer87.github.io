@@ -3,71 +3,129 @@
 <head>
 <meta charset="utf-8">
 <title>Counter Control</title>
-
 <style>
-body {
-  font-family: sans-serif;
-  background: #181818;
-  color: #eee;
-  padding: 10px;
-  user-select: text;          /* ✅ allow selection */
-}
+  body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: #1c1c1c; /* OBS Background */
+    color: #afafaf;     /* OBS Text color */
+    padding: 12px;
+    margin: 0;
+    user-select: none;
+  }
+  
+  h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #ffffff;
+  }
 
-input {
-  width: 100%;
-  margin: 4px 0;
-  padding: 6px;
-  user-select: text;          /* ✅ allow copy/paste */
-}
+  .button-group {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 8px;
+  }
 
-button {
-  width: 100%;
-  margin: 4px 0;
-  padding: 6px;
-  cursor: pointer;
-}
+  button {
+    background: #4c4c4c;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.1s;
+    width: 100%;
+  }
 
-#status {
-  font-size: 0.9em;
-  margin-top: 4px;
-}
+  button:hover {
+    background: #6a6a6a;
+  }
 
-.connected { color: #4caf50; }
-.error { color: #f44336; }
+  button:active {
+    background: #3a3a3a;
+  }
 
-#connectionPanel {
-  display: none;              /* 🔒 hidden by default */
-  border-top: 1px solid #333;
-  margin-top: 8px;
-  padding-top: 8px;
-}
+  .btn-reset {
+    background: #383838;
+    color: #e0e0e0;
+  }
+
+  .btn-config {
+    background: transparent;
+    border: 1px solid #4c4c4c;
+    color: #888;
+    font-size: 11px;
+    margin-top: 10px;
+  }
+
+  input {
+    background: #2d2d2d;
+    border: 1px solid #4c4c4c;
+    color: white;
+    padding: 6px;
+    margin: 4px 0;
+    width: calc(100% - 14px);
+    border-radius: 2px;
+  }
+
+  #connectionPanel {
+    display: none;
+    border-top: 1px solid #4c4c4c;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  #status {
+    font-size: 11px;
+    margin-top: 5px;
+    text-align: center;
+  }
+  .connected { color: #4caf50; }
+  .error { color: #f44336; }
 </style>
 </head>
 
 <body>
 
-<h3>Counter</h3>
+<h3>Counter Controls</h3>
 
-<button onclick="send('counter_inc')">+1</button>
-<button onclick="send('counter_reset')">Reset</button>
+<div class="button-group">
+  <button onclick="send('counter_inc')" style="background: #2a5a2a;">+1 Increase</button>
+  <button onclick="send('counter_dec')" style="background: #5a2a2a;">-1 Decrease</button>
+</div>
 
-<button onclick="toggleConnection()">Connection ⚙️</button>
+<button class="btn-reset" onclick="send('counter_reset')">Reset Counter</button>
+
+<button class="btn-config" onclick="toggleConnection()">SETTINGS ⚙️</button>
 
 <div id="connectionPanel">
-  <input id="ip" value="localhost" placeholder="Server IP">
-  <input id="port" value="4455" placeholder="Port">
+  <input id="ip" placeholder="Server IP">
+  <input id="port" placeholder="Port">
   <input id="password" type="password" placeholder="Password">
-
-  <button onclick="connect()">Connect</button>
+  <button onclick="connect()">Connect & Save</button>
   <div id="status">Not connected</div>
 </div>
 
 <script>
 let socket = null;
 
+function saveSettings(ip, port, password) {
+  localStorage.setItem("obs_ip", ip);
+  localStorage.setItem("obs_port", port);
+  localStorage.setItem("obs_password", password);
+}
+
+function loadSettings() {
+  document.getElementById("ip").value = localStorage.getItem("obs_ip") || "localhost";
+  document.getElementById("port").value = localStorage.getItem("obs_port") || "4455";
+  document.getElementById("password").value = localStorage.getItem("obs_password") || "";
+}
+
 function toggleConnection() {
-  const panel = document.getElementById("connectionPanel");
-  panel.style.display = panel.style.display === "none" ? "block" : "none";
+  const p = document.getElementById("connectionPanel");
+  p.style.display = p.style.display === "none" ? "block" : "none";
 }
 
 function setStatus(text, cls = "") {
@@ -80,44 +138,41 @@ function connect() {
   const ip = document.getElementById("ip").value.trim();
   const port = document.getElementById("port").value.trim();
   const password = document.getElementById("password").value;
-  const url = `ws://${ip}:${port}`;
+  saveSettings(ip, port, password);
 
-  socket = new WebSocket(url);
+  if (socket) { socket.close(); }
+
+  socket = new WebSocket(`ws://${ip}:${port}`);
 
   socket.onopen = () => {
     setStatus("Connected", "connected");
-    authenticate(password);
+    // Simple auth for obs-websocket 5.x 
+    socket.send(JSON.stringify({
+      op: 1,
+      d: { rpcVersion: 1, authentication: password || undefined }
+    }));
   };
 
-  socket.onerror = () => {
-    setStatus("Connection error", "error");
-  };
-}
-
-function authenticate(password) {
-  if (!password) return;
-
-  socket.send(JSON.stringify({
-    op: 1,
-    d: {
-      rpcVersion: 1,
-      authentication: password
-    }
-  }));
+  socket.onerror = () => setStatus("Connection error", "error");
+  socket.onclose = () => setStatus("Disconnected", "error");
 }
 
 function send(hotkeyName) {
   if (!socket || socket.readyState !== 1) return;
-
   socket.send(JSON.stringify({
     op: 6,
     d: {
       requestType: "TriggerHotkeyByName",
-      requestId: Date.now().toString(),
+      requestId: "req-" + Date.now(),
       requestData: { hotkeyName }
     }
   }));
 }
+
+window.onload = () => {
+  loadSettings();
+  connect();
+};
 </script>
 
 </body>
