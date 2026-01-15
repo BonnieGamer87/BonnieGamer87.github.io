@@ -6,10 +6,8 @@
   <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js"></script>
 </head>
 <body>
-  <h2>Counter</h2>
-
-  <button onclick="send('inc')">+1</button>
-  <button onclick="send('reset')">Reset</button>
+  <button onclick="inc()">+1</button>
+  <button onclick="reset()">Reset</button>
 
   <script>
     const obs = new OBSWebSocket();
@@ -18,11 +16,15 @@
       await obs.connect("ws://localhost:4455");
     }
 
-    async function send(cmd) {
-      await obs.call("SetPersistentData", {
-        realm: "OBS_WEBSOCKET_DATA_REALM_PROFILE",
-        slotName: "counter_cmd",
-        slotValue: cmd
+    async function inc() {
+      await obs.call("TriggerHotkeyByName", {
+        hotkeyName: "counter_inc"
+      });
+    }
+
+    async function reset() {
+      await obs.call("TriggerHotkeyByName", {
+        hotkeyName: "counter_reset"
       });
     }
 
