@@ -2,32 +2,29 @@
 <html>
 <head>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; display: flex; gap: 10px; padding: 10px; }
-        .btn { 
-            background: #444; color: white; border: none; padding: 20px; 
-            cursor: pointer; flex: 1; border-radius: 5px; font-weight: bold; font-size: 16px;
+        body { background: #222; color: white; font-family: sans-serif; padding: 10px; display: flex; gap: 5px; }
+        button { 
+            flex: 1; padding: 15px; cursor: pointer; border: none; border-radius: 4px;
+            background: #444; color: white; font-weight: bold; font-size: 14px;
         }
-        .btn:hover { background: #666; }
-        .btn:active { background: #222; }
-        .reset { background: #d32f2f; }
+        button:hover { background: #555; }
+        button:active { background: #333; }
+        .reset-btn { background: #a33; }
+        .reset-btn:hover { background: #c44; }
     </style>
 </head>
 <body>
 
-    <button class="btn" onclick="sendAction('inc')">ADD +1</button>
-    <button class="btn reset" onclick="sendAction('res')">RESET</button>
+    <button onclick="press('inc_action')">ADD +1</button>
+    <button class="reset-btn" onclick="press('res_action')">RESET</button>
 
     <script>
-        function sendAction(type) {
+        function press(actionName) {
             if (window.obsstudio) {
-                // This sends the signal directly to the script settings
-                window.obsstudio.setControlLevel(3); // Allows script control
-                window.obsstudio.send('SetScriptSettings', {
-                    'script': 'counter.lua', // MAKE SURE THIS MATCHES YOUR FILENAME
-                    'settings': { 'trigger_action': type }
-                });
+                // This tells OBS to trigger the hotkey named in the Lua script
+                window.obsstudio.send("hotkey_trigger", { "name": actionName });
             } else {
-                alert("This only works inside an OBS Custom Browser Dock!");
+                console.log("Not in OBS Dock");
             }
         }
     </script>
