@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Counter Control</title>
+  <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js"></script>
+</head>
+<body>
+  <h2>Counter</h2>
+
+  <button onclick="send('inc')">+1</button>
+  <button onclick="send('reset')">Reset</button>
+
+  <script>
+    const obs = new OBSWebSocket();
+
+    async function connect() {
+      await obs.connect("ws://localhost:4455");
+    }
+
+    async function send(cmd) {
+      await obs.call("SetPersistentData", {
+        realm: "OBS_WEBSOCKET_DATA_REALM_PROFILE",
+        slotName: "counter_cmd",
+        slotValue: cmd
+      });
+    }
+
+    connect();
+  </script>
+</body>
+</html>
