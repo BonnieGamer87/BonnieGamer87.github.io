@@ -103,10 +103,13 @@ button.danger {
 <h2>Counter Control</h2>
 
 <div class="panel">
-    <label>WebSocket URL</label>
-    <input id="url" placeholder="ws://localhost:4455">
+    <label>Server IP</label>
+    <input id="ip" placeholder="localhost">
 
-    <label>Password</label>
+    <label>Server Port</label>
+    <input id="port" placeholder="4455">
+
+    <label>Server Password</label>
     <input id="password" type="password" placeholder="Saved locally">
 
     <button class="primary" onclick="connect()">Connect</button>
@@ -128,25 +131,29 @@ const STORAGE_KEY = "obsCounterDock";
 // ---------- Load Saved Settings ----------
 (function loadSettings() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    if (saved.url) document.getElementById("url").value = saved.url;
+    if (saved.ip) document.getElementById("ip").value = saved.ip;
+    if (saved.port) document.getElementById("port").value = saved.port;
     if (saved.password) document.getElementById("password").value = saved.password;
 })();
 
 // ---------- Save Settings ----------
 function saveSettings() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        url: document.getElementById("url").value,
+        ip: document.getElementById("ip").value,
+        port: document.getElementById("port").value,
         password: document.getElementById("password").value
     }));
 }
 
 // ---------- OBS WebSocket ----------
 async function connect() {
-    const url = document.getElementById("url").value;
+    const ip = document.getElementById("ip").value || "localhost";
+    const port = document.getElementById("port").value || "4455";
     const password = document.getElementById("password").value;
 
     saveSettings();
 
+    const url = `ws://${ip}:${port}`;
     socket = new WebSocket(url);
 
     socket.onopen = () => setStatus("Connecting…", false);
