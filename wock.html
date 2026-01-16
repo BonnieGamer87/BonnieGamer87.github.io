@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OBS Counter Dock</title>
+
+<style>
+:root {
+    --bg: #1f1f1f;
+    --panel: #2b2b2b;
+    --border: #3c3c3c;
+    --text: #ffffff;
+    --accent: #00aaff;
+    --danger: #ff5555;
+    --success: #4caf50;
+}
+
+* {
+    box-sizing: border-box;
+    font-family: Segoe UI, Roboto, Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    padding: 12px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+label {
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+input {
+    width: 100%;
+    margin-top: 4px;
+    margin-bottom: 10px;
+    padding: 6px;
+    background: #111;
+    color: white;
+    border: 1px solid var(--border);
+}
+
+button {
+    width: 100%;
+    padding: 8px;
+    margin-top: 6px;
+    background: #3a3a3a;
+    border: 1px solid var(--border);
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #4a4a4a;
+}
+
+button.primary {
+    background: var(--accent);
+    border: none;
+}
+
+button.danger {
+    background: var(--danger);
+    border: none;
+}
+
+.controls button {
+    font-size: 16px;
+}
+
+.status {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.status.connected {
+    color: var(--success);
+}
+
+.status.disconnected {
+    color: var(--danger);
+}
+</style>
+</head>
+
+<body>
+
+<h2>Counter Control</h2>
+
+<div class="panel">
+    <label>WebSocket URL</label>
+    <input id="url" placeholder="ws://localhost:4455">
+
+    <label>Password</label>
+    <input id="password" type="password" placeholder="Saved locally">
+
+    <button class="primary" onclick="connect()">Connect</button>
+    <button onclick="disconnect()">Disconnect</button>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+</div>
+
+<div class="panel controls">
+    <button onclick="increment()">➕ Increment</button>
+    <button class="danger" onclick="resetCounter()">🔄 Reset</button>
+</div>
+
+<script>
+let socket;
+let identified = false;
+const STORAGE_KEY = "obsCounterDock";
+
+// ---------- Load Saved Settings ----------
+(function loadSettings() {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+    if (saved.url) document.getElementById("url").value = saved.url;
+    if (saved.password) document.getElementById("password").value = saved.password;
+})();
+
+// ---------- Save Settings ----------
+function saveSettings() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        url: document.getElementById("url").value,
+        password: document.getElementById("password").value
+    }));
+}
+
+// ---------- OBS WebSocket ----------
+async function connect() {
+    const url = document.getElementById("url").value;
+    const password = document.getElementById("password").value;
+
+    saveSettings();
+
+    socket = new WebSocket(url);
+
+    socket.onopen = () => setStatus("Connecting…", false);
+
+    socket.onmessage = async (event) => {
+        const msg = JSON.parse(event.data);
+
+        // Hello
+        if (msg.op === 0) {
+            let auth = {};
+            if (msg.d.authentication) {
+                const { challenge, salt } = msg.d.authentication;
+
+                const secret = await crypto.subtle.digest(
+                    "SHA-256",
+                    new TextEncoder().encode(password + salt)
+                );
+
+                const secretBase64 = btoa(String.fromCharCode(...new Uint8Array(secret)));
+
+                const authResp = await crypto.subtle.digest(
+                    "SHA-256",
+                    new TextEncoder().encode(secretBase64 + challenge)
+                );
+
+                auth.authentication = btoa(
+                    String.fromCharCode(...new Uint8Array(authResp))
+                );
+            }
+
+            socket.send(JSON.stringify({
+                op: 1,
+                d: { rpcVersion: 1, ...auth }
+            }));
+        }
+
+        // Identified
+        if (msg.op === 2) {
+            identified = true;
+            setStatus("Connected", true);
+        }
+    };
+
+    socket.onclose = () => {
+        identified = false;
+        setStatus("Disconnected", false);
+    };
+}
+
+function disconnect() {
+    if (socket) socket.close();
+}
+
+function setStatus(text, ok) {
+    const el = document.getElementById("status");
+    el.innerText = text;
+    el.className = "status " + (ok ? "connected" : "disconnected");
+}
+
+// ---------- Hotkey Triggers ----------
+function triggerHotkey(name) {
+    if (!identified) return;
+
+    socket.send(JSON.stringify({
+        op: 6,
+        d: {
+            requestType: "TriggerHotkeyByName",
+            requestId: crypto.randomUUID(),
+            requestData: { hotkeyName: name }
+        }
+    }));
+}
+
+function increment() {
+    triggerHotkey("counter_inc");
+}
+
+function resetCounter() {
+    triggerHotkey("counter_reset");
+}
+</script>
+
+</body>
+</html>
