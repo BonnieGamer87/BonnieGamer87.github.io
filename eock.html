@@ -11,8 +11,8 @@
     --border: #3c3c3c;
     --text: #ffffff;
     --accent: #00aaff;
-    --danger: #ff5555;
     --success: #4caf50;
+    --danger: #ff5555;
 }
 
 * {
@@ -29,7 +29,7 @@ body {
 
 h2 {
     font-size: 15px;
-    margin: 6px 0;
+    margin-bottom: 8px;
 }
 
 .panel {
@@ -39,13 +39,17 @@ h2 {
     margin-bottom: 8px;
 }
 
+.controls {
+    display: none;
+}
+
 .counter-title {
-    font-size: 13px;
+    font-size: 12px;
     opacity: 0.8;
     margin-bottom: 6px;
 }
 
-.controls {
+.buttons {
     display: flex;
     gap: 6px;
 }
@@ -64,11 +68,11 @@ button:hover {
     background: #4a4a4a;
 }
 
-button.inc { background: #2e7d32; }
-button.dec { background: #c62828; }
-button.reset { background: #6d6d6d; }
+.inc { background: #2e7d32; }
+.dec { background: #c62828; }
+.reset { background: #6d6d6d; }
 
-button.toggle {
+.toggle {
     background: var(--accent);
     border: none;
 }
@@ -81,11 +85,6 @@ button.toggle {
 .connected { color: var(--success); }
 .disconnected { color: var(--danger); }
 
-.connection-panel {
-    display: none;
-    margin-top: 8px;
-}
-
 label {
     font-size: 11px;
     opacity: 0.8;
@@ -93,9 +92,8 @@ label {
 
 input {
     width: 100%;
-    margin-top: 3px;
-    margin-bottom: 6px;
     padding: 6px;
+    margin-bottom: 6px;
     background: #111;
     color: white;
     border: 1px solid var(--border);
@@ -105,32 +103,34 @@ input {
 
 <body>
 
-<h2>Dual Counter Control</h2>
+<h2>Dual Counter</h2>
 
-<!-- Counter 1 -->
-<div class="panel">
-    <div class="counter-title">Counter A</div>
-    <div class="controls">
-        <button class="inc" onclick="hotkey('counter1_inc')">➕</button>
-        <button class="dec" onclick="hotkey('counter1_dec')">➖</button>
-        <button class="reset" onclick="hotkey('counter1_reset')">🔄</button>
+<!-- CONTROL PANEL -->
+<div id="controls" class="controls">
+
+    <div class="panel">
+        <div class="counter-title">Counter A</div>
+        <div class="buttons">
+            <button class="inc" onclick="hotkey('counter1_inc')">➕</button>
+            <button class="dec" onclick="hotkey('counter1_dec')">➖</button>
+            <button class="reset" onclick="hotkey('counter1_reset')">🔄</button>
+        </div>
     </div>
-</div>
 
-<!-- Counter 2 -->
-<div class="panel">
-    <div class="counter-title">Counter B</div>
-    <div class="controls">
-        <button class="inc" onclick="hotkey('counter2_inc')">➕</button>
-        <button class="dec" onclick="hotkey('counter2_dec')">➖</button>
-        <button class="reset" onclick="hotkey('counter2_reset')">🔄</button>
+    <div class="panel">
+        <div class="counter-title">Counter B</div>
+        <div class="buttons">
+            <button class="inc" onclick="hotkey('counter2_inc')">➕</button>
+            <button class="dec" onclick="hotkey('counter2_dec')">➖</button>
+            <button class="reset" onclick="hotkey('counter2_reset')">🔄</button>
+        </div>
     </div>
 </div>
 
 <button class="toggle" onclick="toggleConnection()">⚙ Connection</button>
 
-<!-- Connection Panel -->
-<div id="connectionPanel" class="panel connection-panel">
+<!-- CONNECTION PANEL -->
+<div id="connectionPanel" class="panel">
     <label>Server IP</label>
     <input id="ip" placeholder="localhost">
 
@@ -140,7 +140,7 @@ input {
     <label>Password</label>
     <input id="password" type="password">
 
-    <button onclick="connect()">Reconnect</button>
+    <button onclick="connect()">Connect</button>
     <button onclick="disconnect()">Disconnect</button>
 
     <div id="status" class="status disconnected">Disconnected</div>
@@ -151,13 +151,12 @@ let socket;
 let identified = false;
 const STORE = "obsDualCounter";
 
-// Load saved settings
+// Restore saved connection info
 (function () {
     const s = JSON.parse(localStorage.getItem(STORE) || "{}");
     ip.value = s.ip || "localhost";
     port.value = s.port || "4455";
     password.value = s.password || "";
-    setTimeout(connect, 300); // AUTO CONNECT
 })();
 
 function save() {
@@ -169,8 +168,8 @@ function save() {
 }
 
 function toggleConnection() {
-    const p = document.getElementById("connectionPanel");
-    p.style.display = p.style.display === "none" ? "block" : "none";
+    const panel = connectionPanel;
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
 }
 
 async function connect() {
@@ -203,6 +202,9 @@ async function connect() {
             identified = true;
             status.textContent = "Connected";
             status.className = "status connected";
+
+            connectionPanel.style.display = "none";
+            controls.style.display = "block";
         }
     };
 
@@ -210,6 +212,7 @@ async function connect() {
         identified = false;
         status.textContent = "Disconnected";
         status.className = "status disconnected";
+        controls.style.display = "none";
     };
 }
 
