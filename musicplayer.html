@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Media Player</title>
+    <style>
+        :root { --bg: #0f0f0f; --card: #1e1e1e; --accent: #1db954; --text: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        
+        .player-wrapper { width: 100%; max-width: 800px; display: flex; flex-direction: column; align-items: center; }
+
+        .display-container { 
+            width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 15px; 
+            overflow: hidden; display: flex; align-items: center; justify-content: center; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8); margin-bottom: 10px;
+        }
+        #video-player, #audio-cover { width: 100%; height: 100%; display: none; }
+        #audio-cover { object-fit: cover; background: linear-gradient(45deg, #282828, #121212); }
+
+        .progress-container { width: 100%; display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        input[type="range"] { flex-grow: 1; accent-color: var(--accent); cursor: pointer; }
+
+        .controls-row { display: flex; align-items: center; justify-content: center; gap: 20px; width: 100%; margin: 10px 0; }
+        button { background: #282828; border: none; color: white; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; }
+        .play-btn { background: white; color: black; border-radius: 50%; width: 55px; height: 55px; font-size: 22px; justify-content: center; }
+        .active-repeat { color: var(--accent); outline: 2px solid var(--accent); background: #1a3a25; }
+
+        .utility-bar { margin-bottom: 20px; display: flex; gap: 10px; }
+        #queue-section { width: 100%; background: var(--card); border-radius: 12px; padding: 15px; margin-top: 20px; box-sizing: border-box; }
+        .hidden { display: none; }
+
+        /* Playlist Styles */
+        .queue-list { list-style: none; padding: 0; max-height: 300px; overflow-y: auto; text-align: left; margin: 0; }
+        .queue-item { 
+            padding: 12px; border-bottom: 1px solid #333; 
+            display: flex; align-items: center; justify-content: space-between; 
+            transition: 0.2s; background: var(--card);
+        }
+        
+        /* Drag Handle Style */
+        .drag-handle {
+            cursor: grab;
+            padding-right: 15px;
+            color: #888;
+            user-select: none;
+            font-size: 18px;
+        }
+        .drag-handle:active { cursor: grabbing; }
+
+        /* Song Info Style */
+        .song-info {
+            flex-grow: 1;
+            cursor: pointer; /* Pointer icon for clicking the song name */
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .queue-item.dragging { opacity: 0.4; background: #333; }
+        .queue-item.active .song-info { color: var(--accent); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="player-wrapper">
+    <div class="utility-bar">
+        <input type="file" id="file-input" multiple accept="audio/*,video/mp4" style="display: none;">
+        <button onclick="document.getElementById('file-input').click()">+ Add Files</button>
+        <button onclick="togglePlaylist()" id="toggle-list-btn">Hide Playlist</button>
+    </div>
+
+    <div class="display-container">
+        <video id="video-player"></video>
+        <img id="audio-cover" src="https://via.placeholder.com/800?text=Upload+Media" alt="Cover">
+    </div>
+    
+    <h3 id="current-title">No Track Selected</h3>
+
+    <div class="progress-container">
+        <span id="current-time">0:00</span>
+        <input type="range" id="seek-bar" value="0" max="100">
+        <span id="duration-time">0:00</span>
+    </div>
+
+    <div class="controls-row">
+        <button onclick="prevTrack()">⏮</button>
+        <button class="play-btn" onclick="togglePlay()" id="play-btn">▶</button>
+        <button onclick="nextTrack()">⏭</button>
+        <button onclick="toggleRepeat()" id="repeat-btn">🔁</button>
+        <input type="range" id="volume-bar" value="100" max="100" style="width: 80px;">
+    </div>
+
+    <div id="queue-section">
+        <h4 style="margin: 0 0 10px 0;">Playlist (Drag ☰ to reorder)</h4>
+        <ul class="queue-list" id="queue-list"></ul>
+    </div>
+</div>
+
+<audio id="audio-player"></audio>
+
+<script>
+    let queue = [];
+    let currentIndex = 0;
+    let isRepeating = false;
+    let dragStartIndex = null;
+
+    const fileInput = document.getElementById('file-input');
+    const videoElem = document.getElementById('video-player');
+    const audioElem = document.getElementById('audio-player');
+    const coverElem = document.getElementById('audio-cover');
+    const playBtn = document.getElementById('play-btn');
+    const repeatBtn = document.getElementById('repeat-btn');
+    const seekBar = document.getElementById('seek-bar');
+    const titleDisplay = document.getElementById('current-title');
+
+    function getActivePlayer() { return videoElem.style.display === 'block' ? videoElem : audioElem; }
+
+    fileInput.onchange = (e) => {
+        const files = Array.from(e.target.files);
+        const startEmpty = queue.length === 0;
+        files.forEach(file => {
+            queue.push({ name: file.name, type: file.type, url: URL.createObjectURL(file) });
+        });
+        updateQueueUI();
+        if (startEmpty && queue.length > 0) loadTrack(0);
+    };
+
+    function loadTrack(index) {
+        if (index < 0 || index >= queue.length) return;
+        currentIndex = index;
+        const track = queue[index];
+        videoElem.pause(); audioElem.pause();
+        videoElem.style.display = 'none'; coverElem.style.display = 'none';
+
+        if (track.type.includes('video')) {
+            videoElem.src = track.url; videoElem.style.display = 'block'; videoElem.play();
+        } else {
+            audioElem.src = track.url; coverElem.style.display = 'block'; audioElem.play();
+        }
+        titleDisplay.textContent = track.name;
+        playBtn.textContent = "⏸";
+        updateQueueUI();
+    }
+
+    function togglePlay() {
+        if (queue.length === 0) return;
+        const player = getActivePlayer();
+        player.paused ? (player.play(), playBtn.textContent = "⏸") : (player.pause(), playBtn.textContent = "▶");
+    }
+
+    function nextTrack() {
+        if (currentIndex < queue.length - 1) loadTrack(currentIndex + 1);
+        else if (isRepeating) loadTrack(currentIndex);
+    }
+
+    function prevTrack() { if (currentIndex > 0) loadTrack(currentIndex - 1); }
+
+    function toggleRepeat() { isRepeating = !isRepeating; repeatBtn.classList.toggle('active-repeat'); }
+
+    function togglePlaylist() { document.getElementById('queue-section').classList.toggle('hidden'); }
+
+    // Reorder Logic
+    function handleDrop(index) {
+        const draggedItem = queue.splice(dragStartIndex, 1)[0];
+        queue.splice(index, 0, draggedItem);
+        
+        // Correct the current index so music keeps playing
+        if (dragStartIndex === currentIndex) currentIndex = index;
+        else if (dragStartIndex < currentIndex && index >= currentIndex) currentIndex--;
+        else if (dragStartIndex > currentIndex && index <= currentIndex) currentIndex++;
+        
+        updateQueueUI();
+    }
+
+    function updateQueueUI() {
+        const list = document.getElementById('queue-list');
+        list.innerHTML = "";
+        queue.forEach((t, i) => {
+            const li = document.createElement('li');
+            li.className = `queue-item ${i === currentIndex ? 'active' : ''}`;
+            
+            // Handle (Only this part triggers the drag)
+            const handle = document.createElement('span');
+            handle.className = 'drag-handle';
+            handle.innerHTML = '☰';
+            handle.onmousedown = () => { li.draggable = true; };
+            handle.onmouseup = () => { li.draggable = false; };
+
+            // Song Info (Clickable for playback)
+            const info = document.createElement('div');
+            info.className = 'song-info';
+            info.innerHTML = `<span>${t.name}</span> <span>${t.type.includes('video') ? '🎥' : '🎵'}</span>`;
+            info.onclick = () => loadTrack(i);
+
+            li.appendChild(handle);
+            li.appendChild(info);
+
+            // Drag Events
+            li.ondragstart = () => { dragStartIndex = i; li.classList.add('dragging'); };
+            li.ondragend = () => { li.draggable = false; li.classList.remove('dragging'); };
+            li.ondragover = (e) => e.preventDefault();
+            li.ondrop = () => handleDrop(i);
+            
+            list.appendChild(li);
+        });
+    }
+
+    [videoElem, audioElem].forEach(el => {
+        el.ontimeupdate = () => {
+            seekBar.value = (el.currentTime / el.duration) * 100 || 0;
+            document.getElementById('current-time').textContent = formatTime(el.currentTime);
+            document.getElementById('duration-time').textContent = formatTime(el.duration);
+        };
+        el.onended = () => isRepeating ? (el.currentTime = 0, el.play()) : nextTrack();
+    });
+
+    seekBar.oninput = () => { getActivePlayer().currentTime = (seekBar.value / 100) * getActivePlayer().duration; };
+    document.getElementById('volume-bar').oninput = (e) => { videoElem.volume = audioElem.volume = e.target.value / 100; };
+
+    function formatTime(secs) {
+        if (isNaN(secs)) return "0:00";
+        const m = Math.floor(secs / 60), s = Math.floor(secs % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+</script>
+</body>
+</html>
