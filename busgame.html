@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pixel Bus Lights with XY Sliders</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #111;
+    color: #fff;
+    font-family: sans-serif;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+  }
+  /* Toggle button */
+  #sliderToggle {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #222;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 14px;
+    z-index: 10;
+  }
+  .slider-container {
+    position: fixed;
+    top: 50px;
+    right: 10px;
+    width: 300px;
+    background: rgba(0,0,0,0.85);
+    padding: 10px;
+    box-sizing: border-box;
+    max-height: 500px;
+    overflow-y: auto;
+    display: none; /* Hidden by default */
+    z-index: 9;
+  }
+  .slider-group {
+    margin-bottom: 10px;
+  }
+  label {
+    display: inline-block;
+    width: 140px;
+  }
+  input[type="range"] {
+    width: 120px;
+  }
+  .value {
+    display: inline-block;
+    width: 40px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<button id="sliderToggle">Show Sliders</button>
+
+<div class="slider-container" id="sliders">
+  <h3>Red Light (Inside)</h3>
+  <div class="slider-group">
+    <label for="redPosX">X position:</label>
+    <input type="range" id="redPosX" min="0" max="800" value="55">
+    <span id="redValX" class="value">55</span> px
+  </div>
+  <div class="slider-group">
+    <label for="redPosY">Y position:</label>
+    <input type="range" id="redPosY" min="0" max="600" value="60">
+    <span id="redValY" class="value">60</span> px
+  </div>
+
+  <h3>Orange Light (Outside)</h3>
+  <div class="slider-group">
+    <label for="orangePosX">X position:</label>
+    <input type="range" id="orangePosX" min="0" max="800" value="88">
+    <span id="orangeValX" class="value">88</span> px
+  </div>
+  <div class="slider-group">
+    <label for="orangePosY">Y position:</label>
+    <input type="range" id="orangePosY" min="0" max="600" value="60">
+    <span id="orangeValY" class="value">60</span> px
+  </div>
+
+  <h3>Yellow Light (Inner Bottom)</h3>
+  <div class="slider-group">
+    <label for="yellowPosX">X position:</label>
+    <input type="range" id="yellowPosX" min="0" max="800" value="94">
+    <span id="yellowValX" class="value">94</span> px
+  </div>
+  <div class="slider-group">
+    <label for="yellowPosY">Y position:</label>
+    <input type="range" id="yellowPosY" min="0" max="600" value="205">
+    <span id="yellowValY" class="value">205</span> px
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// Player (bus)
+const player = { width:400, height:400, x:0, y:0, speed:7 };
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  player.y = canvas.height*0.7 - player.height/2;
+  player.x = canvas.width/2 - player.width/2;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Load bus image
+const playerImage = new Image();
+playerImage.src = "https://iili.io/fLMrPdx.png";
+
+// Light system
+let lightMode = 0; // 0=off, 1=orange, 2=red
+let flashState = 0;
+let flashTimer = 0;
+const flashInterval = 20;
+const lightSize = 32;
+const keys = {};
+
+// Light positions (defaults)
+let redPosX=55, redPosY=60;
+let orangePosX=88, orangePosY=60;
+let yellowPosX=94, yellowPosY=205;
+
+// Setup sliders
+function setupSliders() {
+  const sliders = [
+    {idX:"redPosX", idY:"redPosY", valX:"redValX", valY:"redValY"},
+    {idX:"orangePosX", idY:"orangePosY", valX:"orangeValX", valY:"orangeValY"},
+    {idX:"yellowPosX", idY:"yellowPosY", valX:"yellowValX", valY:"yellowValY"}
+  ];
+
+  sliders.forEach(slider => {
+    const sX=document.getElementById(slider.idX);
+    const sY=document.getElementById(slider.idY);
+    const vX=document.getElementById(slider.valX);
+    const vY=document.getElementById(slider.valY);
+
+    sX.addEventListener("input", ()=> {
+      if(slider.idX.includes("red")) redPosX=parseInt(sX.value);
+      else if(slider.idX.includes("orange")) orangePosX=parseInt(sX.value);
+      else yellowPosX=parseInt(sX.value);
+      vX.textContent=sX.value;
+    });
+
+    sY.addEventListener("input", ()=> {
+      if(slider.idY.includes("red")) redPosY=parseInt(sY.value);
+      else if(slider.idY.includes("orange")) orangePosY=parseInt(sY.value);
+      else yellowPosY=parseInt(sY.value);
+      vY.textContent=sY.value;
+    });
+  });
+}
+setupSliders();
+
+// Toggle slider container
+const sliderBtn = document.getElementById("sliderToggle");
+const sliderDiv = document.getElementById("sliders");
+sliderBtn.addEventListener("click", ()=>{
+  if(sliderDiv.style.display==="none") {
+    sliderDiv.style.display="block";
+    sliderBtn.textContent="Hide Sliders";
+  } else {
+    sliderDiv.style.display="none";
+    sliderBtn.textContent="Show Sliders";
+  }
+});
+
+window.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if(e.key.toLowerCase()==="f") {
+    lightMode++;
+    if(lightMode>2) lightMode=0; // order: 0=off,1=orange,2=red
+    flashState=0;
+    flashTimer=0;
+  }
+});
+
+window.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+
+function update() {
+  if(keys["a"]||keys["arrowleft"]) player.x-=player.speed;
+  if(keys["d"]||keys["arrowright"]) player.x+=player.speed;
+  player.x = Math.max(0, Math.min(canvas.width-player.width, player.x));
+
+  if(lightMode===1||lightMode===2){
+    flashTimer++;
+    if(flashTimer>flashInterval){
+      flashState = flashState===0 ? 1 : 0;
+      flashTimer=0;
+    }
+  } else { flashState=0; flashTimer=0; }
+}
+
+function drawPixelCircle(x,y,size,color){
+  ctx.fillStyle=color;
+  const r=Math.floor(size/2);
+  for(let dx=-r; dx<=r; dx++){
+    for(let dy=-r; dy<=r; dy++){
+      if(dx*dx+dy*dy<=r*r) ctx.fillRect(x+dx,y+dy,1,1);
+    }
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
+
+  const leftRedX=player.x+redPosX;
+  const rightRedX=player.x+player.width-redPosX;
+  const leftOrangeX=player.x+orangePosX;
+  const rightOrangeX=player.x+player.width-orangePosX;
+
+  if(lightMode===1){ // orange
+    if(flashState===0) drawPixelCircle(leftOrangeX, player.y+orangePosY, lightSize, "orange");
+    else drawPixelCircle(rightOrangeX, player.y+orangePosY, lightSize, "orange");
+  } else if(lightMode===2){ // red
+    if(flashState===0) drawPixelCircle(leftRedX, player.y+redPosY, lightSize, "red");
+    else drawPixelCircle(rightRedX, player.y+redPosY, lightSize, "red");
+  }
+
+  if(keys["s"]){
+    const leftYellowX = player.x+yellowPosX;
+    const rightYellowX = player.x+player.width-yellowPosX;
+    drawPixelCircle(leftYellowX, player.y+yellowPosY, lightSize, "yellow");
+    drawPixelCircle(rightYellowX, player.y+yellowPosY, lightSize, "yellow");
+  }
+}
+
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+
+</body>
+</html>
