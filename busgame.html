@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Pixel Bus Lights - Updated Blinkers</title>
+<title>Pixel Bus Lights</title>
 <style>
   html, body { margin: 0; padding: 0; overflow: hidden; background: #111; color: #fff; font-family: sans-serif; }
   canvas { display: block; image-rendering: pixelated; }
@@ -35,6 +35,11 @@
   <h3>Blinkers (A/D)</h3>
   <label>X:</label><input id="brakeOuterX" type="range" min="0" max="400" value="61"><span class="value" id="brakeOuterValX">61</span><br>
   <label>Y:</label><input id="brakeOuterY" type="range" min="0" max="400" value="205"><span class="value" id="brakeOuterValY">205</span>
+
+  <h3>Visual</h3>
+  <button id="glowToggle" style="width:100%; padding:6px; background:#333; color:#fff; border:1px solid #555; cursor:pointer;">
+    Glow: OFF
+  </button>
 </div>
 
 <script>
@@ -50,19 +55,26 @@ window.addEventListener("resize", resize);
 resize();
 
 const player = { width: 400, height: 400, x: window.innerWidth / 2 - 200, y: window.innerHeight * 0.4, speed: 7 };
+
 const playerImage = new Image();
 playerImage.crossOrigin = "anonymous";
-playerImage.src = "https://i.imgur.com/8ee3zUA.png";
+playerImage.src = "https://iili.io/fZGS96u.png";
 
-let lightMode = 0, flashState = 0, flashTimer = 0;
-const flashInterval = 15, lightSize = 28, keys = {};
+let lightMode = 0;
+let flashState = 0;
+let flashTimer = 0;
+const flashInterval = 15;
+const lightSize = 28;
+const keys = {};
+let glowEnabled = false;
 
-// Default Positions - Adjusted to your request
+// Positions
 let redPosX = 55, redPosY = 60;
 let orangePosX = 88, orangePosY = 60;
 let brakeInnerX = 94, brakeInnerY = 205;
-let brakeOuterX = 61, brakeOuterY = 205; // YOUR ADJUSTMENT HERE
+let brakeOuterX = 61, brakeOuterY = 205;
 
+// Sliders
 function bind(id, out, updateVar) {
   const s = document.getElementById(id);
   const o = document.getElementById(out);
@@ -78,38 +90,72 @@ bind("brakeInnerY", "brakeInnerValY", v => brakeInnerY = v);
 bind("brakeOuterX", "brakeOuterValX", v => brakeOuterX = v);
 bind("brakeOuterY", "brakeOuterValY", v => brakeOuterY = v);
 
+// UI
 document.getElementById("sliderToggle").onclick = () => {
   const s = document.getElementById("sliders");
   s.style.display = s.style.display === "block" ? "none" : "block";
 };
 
+document.getElementById("glowToggle").onclick = () => {
+  glowEnabled = !glowEnabled;
+  document.getElementById("glowToggle").textContent = `Glow: ${glowEnabled ? "ON" : "OFF"}`;
+};
+
+// Input
 window.onkeydown = e => {
   keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === "f") { lightMode = (lightMode + 1) % 3; flashTimer = 0; }
+  if (e.key.toLowerCase() === "f") {
+    lightMode = (lightMode + 1) % 3;
+    flashTimer = 0;
+  }
 };
 window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
+// Update
 function update() {
   if (keys["a"] || keys["arrowleft"]) player.x -= player.speed;
   if (keys["d"] || keys["arrowright"]) player.x += player.speed;
   player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-  if (lightMode > 0) {
-    flashTimer++;
-    if (flashTimer > flashInterval) { flashState = 1 - flashState; flashTimer = 0; }
-  }
-}
 
-function drawPixelCircle(x, y, size, color) {
-  const pixel = 4; ctx.fillStyle = color; const r = size / 2;
-  for (let dx = -r; dx <= r; dx += pixel) {
-    for (let dy = -r; dy <= r; dy += pixel) {
-      if (dx * dx + dy * dy <= r * r) {
-        ctx.fillRect(Math.round((x + dx) / pixel) * pixel, Math.round((y + dy) / pixel) * pixel, pixel, pixel);
-      }
+  if (lightMode > 0 || keys["a"] || keys["d"]) {
+    flashTimer++;
+    if (flashTimer > flashInterval) {
+      flashState = 1 - flashState;
+      flashTimer = 0;
     }
   }
 }
 
+// Pixel light
+function drawPixelCircle(x, y, size, color) {
+  const pixel = 4;
+  const r = size / 2;
+
+  if (glowEnabled) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 15;
+  } else {
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = color;
+
+  for (let dx = -r; dx <= r; dx += pixel) {
+    for (let dy = -r; dy <= r; dy += pixel) {
+      if (dx * dx + dy * dy <= r * r) {
+        ctx.fillRect(
+          Math.round((x + dx) / pixel) * pixel,
+          Math.round((y + dy) / pixel) * pixel,
+          pixel,
+          pixel
+        );
+      }
+    }
+  }
+  ctx.shadowBlur = 0;
+}
+
+// Draw
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
@@ -117,29 +163,45 @@ function draw() {
   const lx = player.x;
   const rx = player.x + player.width;
 
-  if (lightMode === 1) { // Orange Flash
-    if (flashState === 0) drawPixelCircle(lx + orangePosX, player.y + orangePosY, lightSize, "orange");
-    else drawPixelCircle(rx - orangePosX, player.y + orangePosY, lightSize, "orange");
-  }
-  if (lightMode === 2) { // Red Flash
-    if (flashState === 0) drawPixelCircle(lx + redPosX, player.y + redPosY, lightSize, "red");
-    else drawPixelCircle(rx - redPosX, player.y + redPosY, lightSize, "red");
+  // ORANGE FLASH — alternating
+  if (lightMode === 1) {
+    if (flashState === 0) {
+      drawPixelCircle(lx + orangePosX, player.y + orangePosY, lightSize, "orange");
+    } else {
+      drawPixelCircle(rx - orangePosX, player.y + orangePosY, lightSize, "orange");
+    }
   }
 
+  // RED FLASH — alternating
+  if (lightMode === 2) {
+    if (flashState === 0) {
+      drawPixelCircle(lx + redPosX, player.y + redPosY, lightSize, "red");
+    } else {
+      drawPixelCircle(rx - redPosX, player.y + redPosY, lightSize, "red");
+    }
+  }
+
+  // BRAKES
   if (keys["s"]) {
-    drawPixelCircle(lx + brakeInnerX, player.y + brakeInnerY, lightSize, "#ff0000");
-    drawPixelCircle(rx - brakeInnerX, player.y + brakeInnerY, lightSize, "#ff0000");
+    drawPixelCircle(lx + brakeInnerX, player.y + brakeInnerY, lightSize, "red");
+    drawPixelCircle(rx - brakeInnerX, player.y + brakeInnerY, lightSize, "red");
   }
 
-  // Left Signal
-  if (keys["a"]) drawPixelCircle(lx + brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
-  // Right Signal
-  if (keys["d"]) drawPixelCircle(rx - brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
+  // LEFT BLINKER
+  if (keys["a"] && flashState === 0) {
+    drawPixelCircle(lx + brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
+  }
+
+  // RIGHT BLINKER
+  if (keys["d"] && flashState === 0) {
+    drawPixelCircle(rx - brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
+  }
 }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 playerImage.onload = loop;
 playerImage.onerror = loop;
 </script>
+
 </body>
 </html>
