@@ -4,43 +4,21 @@
 <meta charset="UTF-8">
 <title>Pixel Bus Lights</title>
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: #111; color: #fff; font-family: sans-serif; }
-  canvas { display: block; image-rendering: pixelated; }
-  #sliderToggle { position: fixed; top: 10px; right: 10px; background: #444; color: #fff; border: 1px solid #666; padding: 10px 15px; cursor: pointer; z-index: 10; }
-  .slider-container { position: fixed; top: 50px; right: 10px; width: 280px; background: rgba(0,0,0,0.9); padding: 15px; border: 1px solid #444; max-height: 80vh; overflow-y: auto; display: none; z-index: 9; }
-  h3 { margin: 10px 0 5px 0; font-size: 14px; color: #aaa; text-transform: uppercase; }
-  label { width: 30px; display: inline-block; font-size: 12px; }
-  input[type="range"] { width: 160px; vertical-align: middle; }
-  .value { width: 35px; display: inline-block; text-align: right; font-family: monospace; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #111;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+  }
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
-<button id="sliderToggle">Settings</button>
-
-<div class="slider-container" id="sliders">
-  <h3>Red Flash (F)</h3>
-  <label>X:</label><input id="redPosX" type="range" min="0" max="400" value="55"><span class="value" id="redValX">55</span><br>
-  <label>Y:</label><input id="redPosY" type="range" min="0" max="400" value="60"><span class="value" id="redValY">60</span>
-
-  <h3>Orange Flash (F)</h3>
-  <label>X:</label><input id="orangePosX" type="range" min="0" max="400" value="88"><span class="value" id="orangeValX">88</span><br>
-  <label>Y:</label><input id="orangePosY" type="range" min="0" max="400" value="60"><span class="value" id="orangeValY">60</span>
-
-  <h3>Brakes (S)</h3>
-  <label>X:</label><input id="brakeInnerX" type="range" min="0" max="400" value="94"><span class="value" id="brakeInnerValX">94</span><br>
-  <label>Y:</label><input id="brakeInnerY" type="range" min="0" max="400" value="205"><span class="value" id="brakeInnerValY">205</span>
-
-  <h3>Blinkers (A/D)</h3>
-  <label>X:</label><input id="brakeOuterX" type="range" min="0" max="400" value="61"><span class="value" id="brakeOuterValX">61</span><br>
-  <label>Y:</label><input id="brakeOuterY" type="range" min="0" max="400" value="205"><span class="value" id="brakeOuterValY">205</span>
-
-  <h3>Visual</h3>
-  <button id="glowToggle" style="width:100%; padding:6px; background:#333; color:#fff; border:1px solid #555; cursor:pointer;">
-    Glow: OFF
-  </button>
-</div>
 
 <script>
 const canvas = document.getElementById("game");
@@ -54,70 +32,114 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-const player = { width: 400, height: 400, x: window.innerWidth / 2 - 200, y: window.innerHeight * 0.4, speed: 7 };
+// SCENE 1 SETTINGS
+const scene1Scale = 2.2;
+const scene1GroundOffset = 40;
+const gravity = 1;
+const jumpPower = 18;
 
+// IMAGES
 const playerImage = new Image();
-playerImage.crossOrigin = "anonymous";
 playerImage.src = "https://iili.io/fZGS96u.png";
 
+const scene2Image = new Image();
+scene2Image.src =
+  "https://thelvboys.odoo.com/web/image/6202?access_token=51c9f23a72cfe9e8cdafddfee962c94280b513893cbb6af202ead81ff30e04a9o0x69aa11c8&filename=pixelated-image%20(1).png&unique=71499ee79da9bee3268afde12db92c73a48279d4";
+
+// STATE
+let scene = 0;
 let lightMode = 0;
 let flashState = 0;
 let flashTimer = 0;
 const flashInterval = 15;
 const lightSize = 28;
 const keys = {};
-let glowEnabled = false;
+let hazardsOn = false;
+let glowEnabled = true;
 
-// Positions
+// LIGHT POSITIONS
 let redPosX = 55, redPosY = 60;
 let orangePosX = 88, orangePosY = 60;
 let brakeInnerX = 94, brakeInnerY = 205;
 let brakeOuterX = 61, brakeOuterY = 205;
 
-// Sliders
-function bind(id, out, updateVar) {
-  const s = document.getElementById(id);
-  const o = document.getElementById(out);
-  s.oninput = () => { o.textContent = s.value; updateVar(parseInt(s.value)); };
-}
-
-bind("redPosX", "redValX", v => redPosX = v);
-bind("redPosY", "redValY", v => redPosY = v);
-bind("orangePosX", "orangeValX", v => orangePosX = v);
-bind("orangePosY", "orangeValY", v => orangePosY = v);
-bind("brakeInnerX", "brakeInnerValX", v => brakeInnerX = v);
-bind("brakeInnerY", "brakeInnerValY", v => brakeInnerY = v);
-bind("brakeOuterX", "brakeOuterValX", v => brakeOuterX = v);
-bind("brakeOuterY", "brakeOuterValY", v => brakeOuterY = v);
-
-// UI
-document.getElementById("sliderToggle").onclick = () => {
-  const s = document.getElementById("sliders");
-  s.style.display = s.style.display === "block" ? "none" : "block";
+// SCENE SPECIFIC POSITIONS
+const scenePositions = {
+  0: { x: window.innerWidth / 2 - 200, y: window.innerHeight * 0.4 }, // bus default
+  1: { x: window.innerWidth / 2 - 200, y: canvas.height - 400 * scene1Scale - scene1GroundOffset } // scene1 image default
 };
 
-document.getElementById("glowToggle").onclick = () => {
-  glowEnabled = !glowEnabled;
-  document.getElementById("glowToggle").textContent = `Glow: ${glowEnabled ? "ON" : "OFF"}`;
+// PLAYER
+const player = {
+  width: 400,
+  height: 400,
+  x: scenePositions[0].x,
+  y: scenePositions[0].y,
+  vy: 0,
+  onGround: false,
+  speed: 7
 };
 
-// Input
+// INPUT
 window.onkeydown = e => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === "f") {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+
+  if (k === "f" && scene === 0) {
     lightMode = (lightMode + 1) % 3;
     flashTimer = 0;
   }
+
+  if (k === "h" && scene === 0) {
+    hazardsOn = !hazardsOn;
+    flashTimer = 0;
+  }
+
+  if (k === "q") {
+    scene = scene === 0 ? 1 : 0;
+    lightMode = 0;
+    hazardsOn = false;
+    player.vy = 0;
+
+    // Reset position to scene-specific starting coordinates
+    player.x = scenePositions[scene].x;
+    player.y = scenePositions[scene].y;
+  }
+
+  if (k === "w" && scene === 1 && player.onGround) {
+    player.vy = -jumpPower;
+    player.onGround = false;
+  }
 };
+
 window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
-// Update
+// UPDATE
 function update() {
   if (keys["a"] || keys["arrowleft"]) player.x -= player.speed;
   if (keys["d"] || keys["arrowright"]) player.x += player.speed;
-  player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
-  if (lightMode > 0 || keys["a"] || keys["d"]) {
+  if (scene === 1 && scene2Image.complete) {
+    // Gravity / jump
+    player.vy += gravity;
+    player.y += player.vy;
+
+    const imgH = scene2Image.naturalHeight * scene1Scale;
+    const groundY = canvas.height - imgH - scene1GroundOffset;
+
+    if (player.y >= groundY) {
+      player.y = groundY;
+      player.vy = 0;
+      player.onGround = true;
+    }
+
+    const imgW = scene2Image.naturalWidth * scene1Scale;
+    player.x = Math.max(0, Math.min(canvas.width - imgW, player.x));
+  } else {
+    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+  }
+
+  if (scene === 0 && (lightMode > 0 || keys["a"] || keys["d"] || hazardsOn)) {
     flashTimer++;
     if (flashTimer > flashInterval) {
       flashState = 1 - flashState;
@@ -126,19 +148,14 @@ function update() {
   }
 }
 
-// Pixel light
+// PIXEL LIGHT WITH GLOW
 function drawPixelCircle(x, y, size, color) {
   const pixel = 4;
   const r = size / 2;
 
-  if (glowEnabled) {
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 15;
-  } else {
-    ctx.shadowBlur = 0;
-  }
-
   ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = glowEnabled ? 16 : 0;
 
   for (let dx = -r; dx <= r; dx += pixel) {
     for (let dy = -r; dy <= r; dy += pixel) {
@@ -155,50 +172,56 @@ function drawPixelCircle(x, y, size, color) {
   ctx.shadowBlur = 0;
 }
 
-// Draw
+// DRAW
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (scene === 1 && scene2Image.complete) {
+    const w = scene2Image.naturalWidth * scene1Scale;
+    const h = scene2Image.naturalHeight * scene1Scale;
+    ctx.drawImage(scene2Image, player.x, player.y, w, h);
+    return;
+  }
+
+  // Scene 0 (bus)
   ctx.drawImage(playerImage, player.x, player.y, player.width, player.height);
 
   const lx = player.x;
   const rx = player.x + player.width;
 
-  // ORANGE FLASH — alternating
-  if (lightMode === 1) {
-    if (flashState === 0) {
-      drawPixelCircle(lx + orangePosX, player.y + orangePosY, lightSize, "orange");
-    } else {
-      drawPixelCircle(rx - orangePosX, player.y + orangePosY, lightSize, "orange");
-    }
-  }
+  if (lightMode === 1 && flashState === 0)
+    drawPixelCircle(lx + orangePosX, player.y + orangePosY, lightSize, "orange");
+  if (lightMode === 1 && flashState === 1)
+    drawPixelCircle(rx - orangePosX, player.y + orangePosY, lightSize, "orange");
 
-  // RED FLASH — alternating
-  if (lightMode === 2) {
-    if (flashState === 0) {
-      drawPixelCircle(lx + redPosX, player.y + redPosY, lightSize, "red");
-    } else {
-      drawPixelCircle(rx - redPosX, player.y + redPosY, lightSize, "red");
-    }
-  }
+  if (lightMode === 2 && flashState === 0)
+    drawPixelCircle(lx + redPosX, player.y + redPosY, lightSize, "red");
+  if (lightMode === 2 && flashState === 1)
+    drawPixelCircle(rx - redPosX, player.y + redPosY, lightSize, "red");
 
-  // BRAKES
   if (keys["s"]) {
     drawPixelCircle(lx + brakeInnerX, player.y + brakeInnerY, lightSize, "red");
     drawPixelCircle(rx - brakeInnerX, player.y + brakeInnerY, lightSize, "red");
   }
 
-  // LEFT BLINKER
-  if (keys["a"] && flashState === 0) {
+  if (hazardsOn && flashState === 0) {
     drawPixelCircle(lx + brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
-  }
-
-  // RIGHT BLINKER
-  if (keys["d"] && flashState === 0) {
     drawPixelCircle(rx - brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
   }
+
+  if (!hazardsOn && keys["a"] && flashState === 0)
+    drawPixelCircle(lx + brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
+
+  if (!hazardsOn && keys["d"] && flashState === 0)
+    drawPixelCircle(rx - brakeOuterX, player.y + brakeOuterY, lightSize, "yellow");
 }
 
-function loop() { update(); draw(); requestAnimationFrame(loop); }
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
 playerImage.onload = loop;
 playerImage.onerror = loop;
 </script>
