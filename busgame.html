@@ -33,10 +33,10 @@ window.addEventListener("resize", resize);
 resize();
 
 // SCENE 1 SETTINGS
-const scene1Scale = 2.2;
+const scene1Scale = 2.5;
 const scene1GroundOffset = 40;
-const gravity = 1;
-const jumpPower = 18;
+const gravity = 0.40;     // LOWER GRAVITY
+const jumpPower = 15;     // HIGHER JUMP
 
 // IMAGES
 const playerImage = new Image();
@@ -63,18 +63,12 @@ let orangePosX = 88, orangePosY = 60;
 let brakeInnerX = 94, brakeInnerY = 205;
 let brakeOuterX = 61, brakeOuterY = 205;
 
-// SCENE SPECIFIC POSITIONS
-const scenePositions = {
-  0: { x: window.innerWidth / 2 - 200, y: window.innerHeight * 0.4 }, // bus default
-  1: { x: window.innerWidth / 2 - 200, y: canvas.height - 400 * scene1Scale - scene1GroundOffset } // scene1 image default
-};
-
 // PLAYER
 const player = {
   width: 400,
   height: 400,
-  x: scenePositions[0].x,
-  y: scenePositions[0].y,
+  x: window.innerWidth / 2 - 200,
+  y: window.innerHeight * 0.4,
   vy: 0,
   onGround: false,
   speed: 7
@@ -100,10 +94,18 @@ window.onkeydown = e => {
     lightMode = 0;
     hazardsOn = false;
     player.vy = 0;
+    player.onGround = false;
 
-    // Reset position to scene-specific starting coordinates
-    player.x = scenePositions[scene].x;
-    player.y = scenePositions[scene].y;
+    // CENTER SCENE 1 IMAGE
+    if (scene === 1 && scene2Image.complete) {
+      const w = scene2Image.naturalWidth * scene1Scale;
+      const h = scene2Image.naturalHeight * scene1Scale;
+      player.x = (canvas.width - w) / 2;
+      player.y = (canvas.height - h) / 2;
+    } else {
+      player.x = window.innerWidth / 2 - 200;
+      player.y = window.innerHeight * 0.4;
+    }
   }
 
   if (k === "w" && scene === 1 && player.onGround) {
