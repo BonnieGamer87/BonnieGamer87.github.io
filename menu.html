@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PS3 XMB - Clean View</title>
+
+<style>
+:root {
+  --cat-spacing: 160px;
+  --item-height: 60px;
+  --focus-top: 35%; 
+  --focus-left: 20%;
+  --accent-glow: rgba(255, 255, 255, 0.4);
+  --transition-speed: 0.45s;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  background: #000;
+  font-family: "Segoe UI", sans-serif;
+  overflow: hidden;
+  color: #fff;
+  user-select: none;
+}
+
+.bg-wave {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 120%, #1e5799 0%, #16367a 40%, #000 100%);
+  z-index: -1;
+}
+
+.viewport {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+.world {
+  position: absolute;
+  top: var(--focus-top);
+  left: var(--focus-left);
+  display: flex;
+  transition: transform var(--transition-speed) var(--ease);
+}
+
+/* The Item Separator (Pipe) */
+.v-pipe {
+  margin-left: 50px;
+  opacity: 0.3;
+  font-size: 18px;
+  line-height: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+}
+
+.column {
+  width: var(--cat-spacing);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: opacity 0.3s, filter 0.3s;
+  opacity: 0.3;
+  filter: blur(1px);
+}
+
+.column.active { opacity: 1; filter: blur(0); }
+
+.category { height: 120px; text-align: center; }
+.category .icon { font-size: 48px; transition: transform 0.4s var(--ease); }
+.column.active .category .icon { transform: scale(1.25); text-shadow: 0 0 20px var(--accent-glow); }
+
+.items-list { 
+  margin-top: 20px; 
+  transition: transform var(--transition-speed) var(--ease), margin-left var(--transition-speed) var(--ease); 
+  opacity: 0;
+}
+
+.column.active .items-list { opacity: 1; }
+
+.item { height: var(--item-height); display: flex; align-items: center; min-width: 400px; gap: 25px; opacity: 0.4; }
+.item.active { opacity: 1; }
+.item .label { font-size: 22px; font-weight: 300; }
+</style>
+</head>
+<body>
+
+<div class="bg-wave"></div>
+<div class="viewport">
+  <div id="world" class="world"></div>
+</div>
+
+<script>
+const menu = [
+  { icon: "👤", label: "Users", items: [{icon:"➕",label:"Create User"}, {icon:"👤",label:"Player 1"}, {icon:"👥",label:"Guest"}] },
+  { icon: "⚙️", label: "Settings", items: [{icon:"🔄",label:"System Update"}, {icon:"🎨",label:"Theme Settings"}, {icon:"🖥️",label:"Display Settings"}] },
+  { icon: "📷", label: "Photo", items: [{icon:"🖼️",label:"Gallery"}, {icon:"📷",label:"Camera"}] },
+  { icon: "🎵", label: "Music", items: [{icon:"🎧",label:"All Songs"}, {icon:"💿",label:"Import"}] },
+  { icon: "🎞️", label: "Video", items: [{icon:"🎬",label:"Movies"}, {icon:"▶️",label:"Netflix"}] },
+  { icon: "🎮", label: "Game", items: [{icon:"📀",label:"Disc"}, {icon:"🏆",label:"Trophies"}] },
+];
+
+let catIndex = 1;
+let itemIndex = 0;
+const manualX = 380; // Hardcoded displacement value
+
+const world = document.getElementById("world");
+
+function init() {
+  world.innerHTML = menu.map((cat, i) => `
+    <div class="column" data-index="${i}">
+      <div class="category">
+        <div class="icon">${cat.icon}</div>
+        <div class="label">${cat.label}</div>
+      </div>
+      <div class="items-list">
+        ${cat.items.map((it, j) => `
+          <div class="item">
+            <div class="icon">${it.icon}</div>
+            <div class="label">${it.label}</div>
+          </div>
+        `).join('<div class="v-pipe">|</div>')} 
+      </div>
+    </div>
+  `).join('');
+  update();
+}
+
+function update() {
+  world.style.transform = `translateX(${-catIndex * 160}px)`;
+
+  document.querySelectorAll('.column').forEach((col, i) => {
+    const isActive = (i === catIndex);
+    col.classList.toggle('active', isActive);
+    
+    const list = col.querySelector('.items-list');
+    if (isActive) {
+      list.style.transform = `translateY(${-itemIndex * 60}px)`;
+      list.style.marginLeft = `${manualX}px`;
+      
+      col.querySelectorAll('.item').forEach((item, j) => {
+        item.classList.toggle('active', j === itemIndex);
+      });
+    } else {
+      list.style.marginLeft = `0px`;
+    }
+  });
+}
+
+window.addEventListener("keydown", e => {
+  if(e.key === "ArrowLeft") { catIndex = Math.max(0, catIndex - 1); itemIndex = 0; }
+  if(e.key === "ArrowRight") { catIndex = Math.min(menu.length - 1, catIndex + 1); itemIndex = 0; }
+  if(e.key === "ArrowUp") itemIndex = Math.max(0, itemIndex - 1);
+  if(e.key === "ArrowDown") itemIndex = Math.min(menu[catIndex].items.length - 1, itemIndex + 1);
+  update();
+});
+
+init();
+</script>
+</body>
+</html>
