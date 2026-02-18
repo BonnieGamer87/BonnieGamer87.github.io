@@ -1,165 +1,270 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>PS3 XMB - Clean View</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PS3 XMB - Just a Little Left</title>
+    <style>
+        :root {
+            --bg-color-1: #2b2b6b;
+            --bg-color-2: #000000;
+        }
 
-<style>
-:root {
-  --cat-spacing: 160px;
-  --item-height: 60px;
-  --focus-top: 35%; 
-  --focus-left: 20%;
-  --accent-glow: rgba(255, 255, 255, 0.4);
-  --transition-speed: 0.45s;
-  --ease: cubic-bezier(0.23, 1, 0.32, 1);
-}
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at 50% 50%, var(--bg-color-1) 0%, var(--bg-color-2) 100%);
+            color: white;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            transition: background 1.5s ease;
+        }
 
-body {
-  margin: 0;
-  height: 100vh;
-  background: #000;
-  font-family: "Segoe UI", sans-serif;
-  overflow: hidden;
-  color: #fff;
-  user-select: none;
-}
+        /* Silk Wave Effect */
+        .wave-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            opacity: 0.2;
+            background: 
+                linear-gradient(110deg, transparent 40%, rgba(255,255,255,0.05) 45%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 55%, transparent 60%);
+            background-size: 250% 250%;
+            animation: silkMotion 12s infinite linear;
+        }
 
-.bg-wave {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 50% 120%, #1e5799 0%, #16367a 40%, #000 100%);
-  z-index: -1;
-}
+        @keyframes silkMotion {
+            0% { background-position: -120% 0%; }
+            100% { background-position: 120% 0%; }
+        }
 
-.viewport {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
-}
+        /* --- Horizontal Axis --- */
+        #h-menu-container {
+            position: absolute;
+            top: 20%; 
+            left: 40%; /* "A little left" (40%) instead of a "brick left" (25%) */
+            transform: translateX(-50%);
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+        }
 
-.world {
-  position: absolute;
-  top: var(--focus-top);
-  left: var(--focus-left);
-  display: flex;
-  transition: transform var(--transition-speed) var(--ease);
-}
+        #h-menu {
+            display: flex;
+            align-items: flex-start;
+            transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+        }
 
-/* The Item Separator (Pipe) */
-.v-pipe {
-  margin-left: 50px;
-  opacity: 0.3;
-  font-size: 18px;
-  line-height: 0;
-  height: 0;
-  display: flex;
-  align-items: center;
-}
+        .category {
+            position: relative;
+            min-width: 170px; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            opacity: 0.25;
+            transition: opacity 0.4s, transform 0.4s;
+        }
 
-.column {
-  width: var(--cat-spacing);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transition: opacity 0.3s, filter 0.3s;
-  opacity: 0.3;
-  filter: blur(1px);
-}
+        .category.active { opacity: 1; transform: scale(1.1); }
+        .cat-icon { font-size: 50px; margin-bottom: 8px; }
+        .cat-label { font-size: 13px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; }
 
-.column.active { opacity: 1; filter: blur(0); }
+        /* --- Vertical Axis --- */
+        .v-list {
+            position: absolute;
+            top: 0; left: 0; width: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
 
-.category { height: 120px; text-align: center; }
-.category .icon { font-size: 48px; transition: transform 0.4s var(--ease); }
-.column.active .category .icon { transform: scale(1.25); text-shadow: 0 0 20px var(--accent-glow); }
+        .category.active .v-list { opacity: 1; }
 
-.items-list { 
-  margin-top: 20px; 
-  transition: transform var(--transition-speed) var(--ease), margin-left var(--transition-speed) var(--ease); 
-  opacity: 0;
-}
+        .item {
+            position: absolute;
+            width: 500px;
+            left: 50%; 
+            text-align: left;
+            padding: 0 20px;
+            white-space: nowrap;
+            color: rgba(255,255,255,0.4);
+            transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), color 0.3s, opacity 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
 
-.column.active .items-list { opacity: 1; }
+        .item-icon {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+        }
 
-.item { height: var(--item-height); display: flex; align-items: center; min-width: 400px; gap: 25px; opacity: 0.4; }
-.item.active { opacity: 1; }
-.item .label { font-size: 22px; font-weight: 300; }
-</style>
+        .item.selected {
+            color: #fff;
+            text-shadow: 0 0 5px rgba(255,255,255,0.2);
+        }
+
+        .item.selected .item-icon {
+            background: rgba(255,255,255,0.15);
+        }
+
+        /* Theme Menu */
+        #theme-menu {
+            position: fixed;
+            top: 50%;
+            left: 55%; /* Adjusted to match the 40% layout */
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            border-left: 2px solid rgba(255,255,255,0.5);
+            padding: 20px;
+            display: none;
+            z-index: 200;
+        }
+
+        .theme-option { padding: 12px 40px; font-size: 18px; color: rgba(255,255,255,0.5); cursor: pointer; }
+        .theme-option.active { color: #fff; background: rgba(255,255,255,0.1); }
+    </style>
 </head>
 <body>
 
-<div class="bg-wave"></div>
-<div class="viewport">
-  <div id="world" class="world"></div>
-</div>
+    <div class="wave-container"></div>
 
-<script>
-const menu = [
-  { icon: "👤", label: "Users", items: [{icon:"➕",label:"Create User"}, {icon:"👤",label:"Player 1"}, {icon:"👥",label:"Guest"}] },
-  { icon: "⚙️", label: "Settings", items: [{icon:"🔄",label:"System Update"}, {icon:"🎨",label:"Theme Settings"}, {icon:"🖥️",label:"Display Settings"}] },
-  { icon: "📷", label: "Photo", items: [{icon:"🖼️",label:"Gallery"}, {icon:"📷",label:"Camera"}] },
-  { icon: "🎵", label: "Music", items: [{icon:"🎧",label:"All Songs"}, {icon:"💿",label:"Import"}] },
-  { icon: "🎞️", label: "Video", items: [{icon:"🎬",label:"Movies"}, {icon:"▶️",label:"Netflix"}] },
-  { icon: "🎮", label: "Game", items: [{icon:"📀",label:"Disc"}, {icon:"🏆",label:"Trophies"}] },
-];
-
-let catIndex = 1;
-let itemIndex = 0;
-const manualX = 380; // Hardcoded displacement value
-
-const world = document.getElementById("world");
-
-function init() {
-  world.innerHTML = menu.map((cat, i) => `
-    <div class="column" data-index="${i}">
-      <div class="category">
-        <div class="icon">${cat.icon}</div>
-        <div class="label">${cat.label}</div>
-      </div>
-      <div class="items-list">
-        ${cat.items.map((it, j) => `
-          <div class="item">
-            <div class="icon">${it.icon}</div>
-            <div class="label">${it.label}</div>
-          </div>
-        `).join('<div class="v-pipe">|</div>')} 
-      </div>
+    <div id="theme-menu">
+        <div style="font-size: 11px; color: #888; margin-bottom: 15px; letter-spacing: 2px;">THEME COLOR</div>
+        <div class="theme-option" data-c1="#2b2b6b" data-c2="#000000">Classic Blue</div>
+        <div class="theme-option" data-c1="#1a1a1a" data-c2="#000000">Midnight</div>
+        <div class="theme-option" data-c1="#6b1a1a" data-c2="#1a0000">Crimson</div>
+        <div class="theme-option" data-c1="#1a4b1a" data-c2="#001a00">Forest</div>
+        <div class="theme-option" data-c1="#6b4a1a" data-c2="#1a1000">Amber</div>
     </div>
-  `).join('');
-  update();
-}
 
-function update() {
-  world.style.transform = `translateX(${-catIndex * 160}px)`;
+    <div id="h-menu-container">
+        <div id="h-menu">
+            <div class="category">
+                <span class="cat-icon">👤</span><span class="cat-label">Users</span>
+                <div class="v-list">
+                    <div class="item"><span class="item-icon">➕</span>Create User</div>
+                    <div class="item"><span class="item-icon">👦</span>User 1</div>
+                </div>
+            </div>
 
-  document.querySelectorAll('.column').forEach((col, i) => {
-    const isActive = (i === catIndex);
-    col.classList.toggle('active', isActive);
-    
-    const list = col.querySelector('.items-list');
-    if (isActive) {
-      list.style.transform = `translateY(${-itemIndex * 60}px)`;
-      list.style.marginLeft = `${manualX}px`;
-      
-      col.querySelectorAll('.item').forEach((item, j) => {
-        item.classList.toggle('active', j === itemIndex);
-      });
-    } else {
-      list.style.marginLeft = `0px`;
-    }
-  });
-}
+            <div class="category">
+                <span class="cat-icon">⚙️</span><span class="cat-label">Settings</span>
+                <div class="v-list">
+                    <div class="item"><span class="item-icon">🔄</span>System Update</div>
+                    <div class="item" id="theme-trigger"><span class="item-icon">🎨</span>Theme Settings</div>
+                    <div class="item"><span class="item-icon">🛠️</span>System Settings</div>
+                    <div class="item"><span class="item-icon">🌐</span>Network Settings</div>
+                </div>
+            </div>
 
-window.addEventListener("keydown", e => {
-  if(e.key === "ArrowLeft") { catIndex = Math.max(0, catIndex - 1); itemIndex = 0; }
-  if(e.key === "ArrowRight") { catIndex = Math.min(menu.length - 1, catIndex + 1); itemIndex = 0; }
-  if(e.key === "ArrowUp") itemIndex = Math.max(0, itemIndex - 1);
-  if(e.key === "ArrowDown") itemIndex = Math.min(menu[catIndex].items.length - 1, itemIndex + 1);
-  update();
-});
+            <div class="category">
+                <span class="cat-icon">🎮</span><span class="cat-label">Game</span>
+                <div class="v-list">
+                    <div class="item"><span class="item-icon">🏆</span>Trophies</div>
+                    <div class="item"><span class="item-icon">💿</span>Metal Gear Solid 4</div>
+                    <div class="item"><span class="item-icon">💿</span>Uncharted 2</div>
+                    <div class="item"><span class="item-icon">💿</span>The Last of Us</div>
+                    <div class="item"><span class="item-icon">💿</span>LittleBigPlanet</div>
+                    <div class="item"><span class="item-icon">💿</span>God of War III</div>
+                    <div class="item"><span class="item-icon">📁</span>Saved Data Utility</div>
+                    <div class="item"><span class="item-icon">💾</span>Game Data Utility</div>
+                </div>
+            </div>
 
-init();
-</script>
+            <div class="category">
+                <span class="cat-icon">🔵</span><span class="cat-label">PSN</span>
+                <div class="v-list">
+                    <div class="item"><span class="item-icon">🛍️</span>PlayStation Store</div>
+                    <div class="item"><span class="item-icon">🏠</span>PlayStation Home</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const H_SHIFT = 235;
+        const LINE_HEIGHT = 50;
+        const LEAP_GAP = 112;
+        const START_Y = 108;
+        const CAT_SPACING = 170;
+
+        let hIndex = 1; 
+        let vIndex = 0; 
+        let isThemeMenuOpen = false;
+        let themeOptionIndex = 0;
+
+        function updateUI() {
+            const hMenu = document.getElementById('h-menu');
+            const categories = document.querySelectorAll('.category');
+            hMenu.style.transform = `translateX(${-(hIndex * CAT_SPACING)}px)`;
+
+            categories.forEach((cat, index) => {
+                cat.classList.toggle('active', index === hIndex);
+                if (index === hIndex) renderVerticalList(cat);
+            });
+        }
+
+        function renderVerticalList(categoryEl) {
+            const items = categoryEl.querySelectorAll('.item');
+            items.forEach((item, index) => {
+                const distance = index - vIndex;
+                item.classList.toggle('selected', distance === 0);
+                let yPos = START_Y + (distance * LINE_HEIGHT);
+                if (distance < 0) { yPos -= LEAP_GAP; }
+                item.style.transform = `translate(calc(-50% + ${H_SHIFT}px), ${yPos}px)`;
+                item.style.opacity = Math.abs(distance) > 6 ? 0 : (distance === 0 ? 1 : 0.4);
+            });
+        }
+
+        function updateThemeSelection() {
+            const options = document.querySelectorAll('.theme-option');
+            options.forEach((opt, i) => opt.classList.toggle('active', i === themeOptionIndex));
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (isThemeMenuOpen) {
+                const options = document.querySelectorAll('.theme-option');
+                if (e.key === 'ArrowDown' && themeOptionIndex < options.length - 1) {
+                    themeOptionIndex++;
+                } else if (e.key === 'ArrowUp' && themeOptionIndex > 0) {
+                    themeOptionIndex--;
+                } else if (e.key === 'Enter') {
+                    const selected = options[themeOptionIndex];
+                    document.documentElement.style.setProperty('--bg-color-1', selected.dataset.c1);
+                    document.documentElement.style.setProperty('--bg-color-2', selected.dataset.c2);
+                } else if (e.key === 'Escape' || e.key === 'Backspace') {
+                    isThemeMenuOpen = false;
+                    document.getElementById('theme-menu').style.display = 'none';
+                }
+                updateThemeSelection();
+                return;
+            }
+
+            const categories = document.querySelectorAll('.category');
+            if (e.key === 'ArrowRight' && hIndex < categories.length - 1) {
+                hIndex++; vIndex = 0; updateUI();
+            } else if (e.key === 'ArrowLeft' && hIndex > 0) {
+                hIndex--; vIndex = 0; updateUI();
+            } else if (e.key === 'ArrowDown') {
+                const activeItems = categories[hIndex].querySelectorAll('.item');
+                if (vIndex < activeItems.length - 1) { vIndex++; updateUI(); }
+            } else if (e.key === 'ArrowUp' && vIndex > 0) {
+                vIndex--; updateUI();
+            } else if (e.key === 'Enter') {
+                const activeItems = categories[hIndex].querySelectorAll('.item');
+                if (activeItems[vIndex].id === 'theme-trigger') {
+                    isThemeMenuOpen = true;
+                    document.getElementById('theme-menu').style.display = 'block';
+                    updateThemeSelection();
+                }
+            }
+        });
+
+        updateUI();
+    </script>
 </body>
 </html>
