@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mazda RX-7 Rotary Sim</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080809;display:flex;justify-content:center;padding:20px;min-height:100vh;font-family:'Rajdhani',sans-serif;}
+#sim{width:100%;max-width:740px;background:#0d0d0f;border-radius:16px;border:1px solid #1e1e28;padding:16px;outline:none;}
+
+/* WARN BAR */
+#warn-bar{display:flex;gap:8px;justify-content:center;margin-bottom:10px;height:22px;align-items:center;}
+.warn{font-family:'Orbitron',monospace;font-size:9px;padding:3px 10px;border-radius:2px;opacity:0;transition:opacity .3s;letter-spacing:.12em;font-weight:700;}
+.warn.on{opacity:1;animation:warnblink 0.8s ease-in-out infinite;}
+@keyframes warnblink{0%,100%{opacity:1}50%{opacity:.25}}
+#w-oil{background:#3d2000;color:#f90;border:1px solid #f90;}
+#w-temp{background:#2a0000;color:#f44;border:1px solid #f44;}
+#w-fuel{background:#001a2a;color:#4af;border:1px solid #4af;}
+#w-overheat{background:#3a0000;color:#f22;border:1px solid #f22;font-size:9px;}
+
+/* ENGINE */
+#engine-row{display:flex;justify-content:center;margin-bottom:12px;}
+canvas#eng{border-radius:10px;background:#111114;border:1px solid #1e1e28;display:block;}
+
+/* STATUS TEXT */
+#status-line{text-align:center;height:18px;margin-bottom:8px;font-family:'Orbitron',monospace;font-size:11px;letter-spacing:.1em;color:#f90;transition:color .3s;}
+
+/* PRND */
+#prnd-row{display:flex;align-items:center;justify-content:center;margin-bottom:12px;background:#111114;border-radius:8px;border:1px solid #1e1e28;padding:8px 16px;gap:4px;}
+.prnd-sep{width:1px;height:28px;background:#2a2a30;margin:0 6px;}
+.gear-pill{font-family:'Orbitron',monospace;font-size:15px;font-weight:700;letter-spacing:.08em;color:#282830;padding:6px 18px;border-radius:5px;cursor:pointer;transition:all .2s;border:1px solid transparent;background:transparent;user-select:none;}
+.gear-pill:hover{color:#444;}
+.gear-pill.active-P{color:#eee;background:#1a1a20;border-color:#3a3a45;}
+.gear-pill.active-R{color:#f66;background:#1a0000;border-color:#500;}
+.gear-pill.active-N{color:#fa0;background:#1a1200;border-color:#440;}
+.gear-pill.active-D{color:#4f8;background:#001a08;border-color:#084;}
+#start-btn{margin-left:auto;font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:.1em;color:#f90;background:#1a0e00;border:1px solid #5a3500;border-radius:5px;padding:7px 16px;cursor:pointer;transition:all .2s;}
+#start-btn:hover{background:#261500;border-color:#f90;}
+#start-btn.running{color:#f44;background:#1a0000;border-color:#700;}
+#start-btn.running:hover{border-color:#f44;}
+#start-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+/* CLUSTER */
+#cluster{background:#0a0a0c;border-radius:12px;border:1px solid #1a1a22;padding:12px;position:relative;}
+#main-gauges{display:flex;gap:8px;margin-bottom:8px;justify-content:center;align-items:center;}
+.round-gauge-wrap{display:flex;flex-direction:column;align-items:center;}
+canvas.round-gauge{display:block;}
+#mini-gauges{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.mini-gauge-wrap{background:#0f0f12;border:1px solid #1e1e28;border-radius:6px;padding:6px 4px 4px;display:flex;flex-direction:column;align-items:center;}
+canvas.mini-gauge{display:block;}
+.glabel{font-family:'Rajdhani',sans-serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#444;margin-top:3px;}
+.gval{font-family:'Orbitron',monospace;font-size:11px;font-weight:400;color:#bbb;margin-top:1px;}
+
+/* CENTER DISPLAY */
+#center-display{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:100px;padding:0 4px;}
+#gear-display{font-family:'Orbitron',monospace;font-size:42px;font-weight:900;color:#eee;line-height:1;letter-spacing:-.02em;}
+#mph-display{font-family:'Orbitron',monospace;font-size:28px;font-weight:700;color:#fff;line-height:1;margin-top:4px;}
+#mph-unit{font-family:'Rajdhani',sans-serif;font-size:11px;color:#444;letter-spacing:.1em;margin-top:2px;}
+#rpm-digital{font-family:'Orbitron',monospace;font-size:12px;font-weight:400;color:#777;margin-top:3px;letter-spacing:.04em;}
+#drive-gear-display{font-family:'Orbitron',monospace;font-size:11px;color:#4f8;margin-top:2px;letter-spacing:.06em;min-height:14px;}
+
+/* INFO BAR */
+#info-bar{display:flex;gap:16px;justify-content:center;padding:8px 0 2px;border-top:1px solid #151518;margin-top:10px;flex-wrap:wrap;}
+.info-item{font-family:'Rajdhani',sans-serif;font-size:11px;color:#333;letter-spacing:.06em;text-transform:uppercase;}
+.info-item b{color:#666;font-weight:600;}
+</style>
+</head>
+<body>
+<div id="sim" tabindex="0">
+
+  <div id="warn-bar">
+    <div class="warn" id="w-oil">OIL PRES</div>
+    <div class="warn" id="w-temp">OVERHEAT</div>
+    <div class="warn" id="w-fuel">NO FUEL</div>
+    <div class="warn" id="w-overheat">ENGINE OVERHEATED — PRESS ENTER TO RESET</div>
+  </div>
+
+  <div id="engine-row">
+    <canvas id="eng" width="340" height="210"></canvas>
+  </div>
+
+  <div id="status-line" id="status-line"></div>
+
+  <div id="prnd-row">
+    <span class="gear-pill active-P" id="gb-p">P</span>
+    <div class="prnd-sep"></div>
+    <span class="gear-pill" id="gb-r">R</span>
+    <div class="prnd-sep"></div>
+    <span class="gear-pill" id="gb-n">N</span>
+    <div class="prnd-sep"></div>
+    <span class="gear-pill" id="gb-d">D</span>
+    <button id="start-btn">START</button>
+  </div>
+
+  <div id="cluster">
+    <div id="main-gauges">
+      <div class="round-gauge-wrap">
+        <canvas class="round-gauge" id="g-tacho" width="200" height="200"></canvas>
+        <div class="glabel">Tachometer</div>
+      </div>
+
+      <div id="center-display">
+        <div id="gear-display">P</div>
+        <div id="mph-display">---</div>
+        <div id="mph-unit">MPH</div>
+        <div id="rpm-digital">--- RPM</div>
+        <div id="drive-gear-display"></div>
+      </div>
+
+      <div class="round-gauge-wrap">
+        <canvas class="round-gauge" id="g-speedo" width="200" height="200"></canvas>
+        <div class="glabel">Speedometer</div>
+      </div>
+    </div>
+
+    <div id="mini-gauges">
+      <div class="mini-gauge-wrap">
+        <canvas class="mini-gauge" id="g-boost" width="120" height="60"></canvas>
+        <div class="glabel">Boost</div>
+        <div class="gval" id="v-boost">-- psi</div>
+      </div>
+      <div class="mini-gauge-wrap">
+        <canvas class="mini-gauge" id="g-temp" width="120" height="60"></canvas>
+        <div class="glabel">Coolant °C</div>
+        <div class="gval" id="v-temp">--</div>
+      </div>
+      <div class="mini-gauge-wrap">
+        <canvas class="mini-gauge" id="g-oil" width="120" height="60"></canvas>
+        <div class="glabel">Oil psi</div>
+        <div class="gval" id="v-oil">--</div>
+      </div>
+      <div class="mini-gauge-wrap">
+        <canvas class="mini-gauge" id="g-fuel" width="120" height="60"></canvas>
+        <div class="glabel">Fuel</div>
+        <div class="gval" id="v-fuel">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="info-bar">
+    <div class="info-item"><b>W</b> Throttle</div>
+    <div class="info-item"><b>S</b> Brake</div>
+    <div class="info-item"><b>Q/E</b> Shift PRND</div>
+    <div class="info-item"><b>G</b> Start / Stop</div>
+    <div class="info-item"><b>Enter</b> Reset engine</div>
+  </div>
+
+</div>
+<script>
+/* =====================================================
+   VEHICLE STATE
+   ===================================================== */
+const GEAR_NAMES = ['P','R','N','D'];
+let gearIndex = 0;          // 0=P 1=R 2=N 3=D
+let engineOn = false;
+let isCranking = false;
+let crankTimer = 0;
+let isOverheated = false;
+
+/* Physics */
+let velocity = 0;           // m/s (signed, negative = reverse)
+let rpm = 0;
+let throttle = 0;
+let braking = false;
+let currentBoost = 0;
+let rotorAngle = 0;
+let lastT = 0;
+
+/* Consumables */
+let actualFuel = 100;
+let actualOil  = 100;
+
+/* Smooth dash needles */
+let dashRPM = 0, dashSpeed = 0, dashOil = 0, dashTemp = 0, dashFuel = 0, dashBoost = 0;
+
+/* Overheat / redline timer */
+let redlineTimer = 0;
+const REDLINE_LIMIT_SEC = 30;
+
+/* Needle sweep on ignition */
+let isSweeping = false;
+let sweepTimer = 0;
+const SWEEP_DURATION = 1.5;
+
+/* Auto transmission */
+let autoGear = 1;
+const gearRatios   = [2.66, 1.78, 1.30, 1.00, 0.74, 0.50];
+const finalDrive   = 3.73;
+
+/* =====================================================
+   ENGINE / PHYSICS CONSTANTS  (RX-7 13B-REW)
+   ===================================================== */
+const IDLE_RPM    = 900;
+const MAX_RPM     = 9000;
+const REDLINE_RPM = 7500;
+const REV_LIMIT   = 8200;
+
+/* Vehicle physics */
+const mass               = 1260;   // kg (RX-7 FD weight)
+const tireRadius         = 0.315;  // m
+const drivetrainEff      = 0.87;
+const dragCoeff          = 0.29;
+const frontalArea        = 1.8;
+const airDensity         = 1.225;
+const rollingRes         = 0.013;
+const gravity            = 9.81;
+
+/* =====================================================
+   13B-REW TORQUE CURVE
+   Peak ~280 Nm @ ~5000 rpm with twin-turbo boost
+   ===================================================== */
+function getTorque(r) {
+  if (!engineOn) return 0;
+  const boostMult = 1.0 + (currentBoost / 14.7);
+  // Rotary torque: flat mid-range, falls off at top
+  const base = 250 * boostMult * Math.exp(-Math.pow((r - 5500) / 3000, 2));
+  return base * 1.0;   // Nm
+}
+
+/* =====================================================
+   INPUT
+   ===================================================== */
+const keys = {};
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+
+  if (e.key === 'Enter') {
+    // Reset engine after overheat
+    isOverheated = false;
+    redlineTimer = 0;
+    actualFuel   = 100;
+    actualOil    = 100;
+    engineOn     = false;
+    isCranking   = false;
+    rpm          = 0;
+    updateStartBtn();
+  }
+
+  if (!e.repeat) {
+    if (k === 'g') toggleEngine();
+    if (k === 'e') shiftUp();
+    if (k === 'q') shiftDown();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function shiftUp()   { if (gearIndex < 3) setGear(gearIndex + 1); }
+function shiftDown() { if (gearIndex > 0) setGear(gearIndex - 1); }
+
+/* =====================================================
+   ENGINE START / STOP
+   ===================================================== */
+function toggleEngine() {
+  if (engineOn) {
+    // Stop
+    engineOn  = false;
+    isCranking = false;
+    crankTimer = 0;
+    updateStartBtn();
+    return;
+  }
+  if (isOverheated) return;
+  if (actualFuel <= 0) return;
+  // Can only start in P or N
+  if (gearIndex !== 0 && gearIndex !== 2) {
+    setStatus('SHIFT TO P OR N', '#f90');
+    return;
+  }
+  // Begin crank sequence
+  isCranking = true;
+  crankTimer = 0;
+  isSweeping = true;
+  sweepTimer = 0;
+  setStatus('CRANKING...', '#fa0');
+  updateStartBtn();
+}
+
+function updateStartBtn() {
+  const btn = document.getElementById('start-btn');
+  if (engineOn) {
+    btn.textContent = 'STOP';
+    btn.classList.add('running');
+    btn.disabled = false;
+  } else if (isCranking) {
+    btn.textContent = 'CRANK...';
+    btn.classList.remove('running');
+    btn.disabled = true;
+  } else {
+    btn.textContent = 'START';
+    btn.classList.remove('running');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('start-btn').addEventListener('click', e => { e.stopPropagation(); toggleEngine(); });
+['p','r','n','d'].forEach((n,i) => {
+  document.getElementById('gb-'+n).addEventListener('click', e => { e.stopPropagation(); setGear(i); });
+});
+
+/* =====================================================
+   GEAR SELECTOR
+   ===================================================== */
+function setGear(g) {
+  if (!engineOn && !isCranking && g !== 0) return;
+  gearIndex = g;
+  if (g === 3) autoGear = 1;
+  updatePRND();
+}
+
+function updatePRND() {
+  ['p','r','n','d'].forEach((n,i) => {
+    const el = document.getElementById('gb-'+n);
+    el.className = 'gear-pill' + (gearIndex === i ? ' active-'+n.toUpperCase() : '');
+  });
+  const colors = ['#eee','#f66','#fa0','#4f8'];
+  const gd = document.getElementById('gear-display');
+  gd.textContent = GEAR_NAMES[gearIndex];
+  gd.style.color  = colors[gearIndex];
+}
+
+/* =====================================================
+   STATUS LINE
+   ===================================================== */
+let statusTimer = 0;
+function setStatus(msg, color) {
+  const el = document.getElementById('status-line');
+  el.textContent = msg;
+  el.style.color = color || '#f90';
+  statusTimer = 2.5;
+}
+
+/* =====================================================
+   SWEEP HELPER  (0 -> max -> 0 on ignition)
+   ===================================================== */
+function sweepVal(real, min, max) {
+  if (!isSweeping) return real;
+  const t = sweepTimer / SWEEP_DURATION;
+  if (t < 0.5) return min + (t * 2) * (max - min);
+  return max - ((t - 0.5) * 2) * (max - min);
+}
+
+/* =====================================================
+   MAIN UPDATE
+   ===================================================== */
+const DT = 1 / 60;
+
+function update(dt) {
+  /* throttle & brake */
+  if (keys['w'] && engineOn && gearIndex !== 0 && gearIndex !== 2) {
+    throttle = Math.min(1, throttle + dt * 4);
+  } else if (keys['w'] && engineOn && (gearIndex === 0 || gearIndex === 2)) {
+    // Rev in P or N
+    throttle = Math.min(1, throttle + dt * 4);
+  } else {
+    throttle = Math.max(0, throttle - dt * 5);
+  }
+  braking = !!keys['s'];
+
+  /* status line decay */
+  if (statusTimer > 0) {
+    statusTimer -= dt;
+    if (statusTimer <= 0) document.getElementById('status-line').textContent = '';
+  }
+
+  /* CRANKING → START */
+  if (isCranking && !engineOn) {
+    crankTimer += dt;
+    rpm = Math.min(rpm + 400 * dt, 500); // cranking rpm
+    if (crankTimer >= 1.4) {
+      isCranking = false;
+      engineOn   = true;
+      rpm        = IDLE_RPM * 0.6;
+      setStatus('ENGINE RUNNING', '#4f8');
+      updateStartBtn();
+    }
+  }
+
+  /* SWEEP TIMER */
+  if (isSweeping) {
+    sweepTimer += dt;
+    if (sweepTimer >= SWEEP_DURATION) isSweeping = false;
+  }
+
+  /* CONSUMABLES */
+  if (engineOn) {
+    actualFuel = Math.max(0, actualFuel - (0.08 + throttle * 1.2) * dt);
+    actualOil  = Math.max(0, actualOil  - (0.03 + (rpm / MAX_RPM) * 0.3) * dt);
+
+    if (actualFuel <= 0) {
+      engineOn = false;
+      setStatus('OUT OF FUEL', '#f44');
+      updateStartBtn();
+    }
+    if (actualOil <= 0) redlineTimer += dt * 4; // accelerate damage with no oil
+  }
+
+  /* TURBO BOOST */
+  if (engineOn) {
+    let targetBoost = 0;
+    if (throttle > 0.1 && rpm > 2500) {
+      targetBoost = Math.min(18, ((rpm - 2500) / 4500) * 18 * throttle);
+    }
+    currentBoost += (targetBoost - currentBoost) * (throttle > 0 ? 0.025 : 0.1);
+    if (currentBoost < 0.05) currentBoost = 0;
+  } else {
+    currentBoost *= 0.8;
+  }
+
+  /* REDLINE / OVERHEAT */
+  if (isOverheated) {
+    redlineTimer = Math.max(0, redlineTimer - dt * 0.4);
+    if (redlineTimer <= 0) { isOverheated = false; }
+  } else if (engineOn) {
+    if (rpm >= REV_LIMIT) rpm = REV_LIMIT - (Math.random() * 200 + 50);
+    if (rpm >= REDLINE_RPM) {
+      redlineTimer += dt;
+      if (redlineTimer >= REDLINE_LIMIT_SEC) {
+        isOverheated = true;
+        engineOn     = false;
+        setStatus('ENGINE SEIZED — ENTER TO RESET', '#f22');
+        updateStartBtn();
+      }
+    } else {
+      redlineTimer = Math.max(0, redlineTimer - dt * 0.6);
+    }
+  }
+
+  /* RPM & VELOCITY PHYSICS */
+  const gear     = GEAR_NAMES[gearIndex];
+  const engineJitter = engineOn ? Math.sin(Date.now() / 120) * 12 : 0;
+
+  let tractiveForce = 0;
+  const aeroDrag    = 0.5 * airDensity * dragCoeff * frontalArea * velocity * velocity;
+  const rollDrag    = (Math.abs(velocity) > 0.1) ? rollingRes * mass * gravity : 0;
+  const totalRes    = aeroDrag + rollDrag;
+  const brakeForce  = braking ? 12000 : 0;
+
+  if (gear === 'P' || gear === 'N') {
+    /* Rev freely */
+    if (engineOn) {
+      const targetRPM = IDLE_RPM + engineJitter + throttle * (MAX_RPM - IDLE_RPM);
+      rpm += (targetRPM - rpm) * 0.06;
+    } else if (!isCranking) {
+      rpm *= 0.96;
+      if (rpm < 10) rpm = 0;
+    }
+    /* Slow coast to stop */
+    if (velocity > 0)      velocity -= ((totalRes + brakeForce) / mass) * dt;
+    else if (velocity < 0) velocity += ((totalRes + brakeForce) / mass) * dt;
+    if (Math.abs(velocity) < 0.15 && braking) velocity = 0;
+
+  } else if (gear === 'D' || gear === 'R') {
+    const isReverse       = (gear === 'R');
+    const activeRatio     = isReverse ? 2.90 : gearRatios[autoGear - 1];
+    const totalRatio      = activeRatio * finalDrive;
+
+    const wheelRad        = velocity / tireRadius;
+    const mechanicalRPM   = Math.abs((wheelRad * 60) / (Math.PI * 2)) * totalRatio;
+
+    if (engineOn) {
+      const stallSpeed  = 1400;
+      const targetRPM   = Math.max(IDLE_RPM + engineJitter, mechanicalRPM + stallSpeed * throttle);
+      rpm              += (targetRPM - rpm) * 0.14;
+
+      let slipFactor = 1.0;
+      if (mechanicalRPM < stallSpeed) {
+        slipFactor = 1.0 + ((stallSpeed - mechanicalRPM) / stallSpeed) * throttle;
+      }
+
+      const engineTorque = getTorque(rpm) * throttle;
+      tractiveForce = (engineTorque * slipFactor * totalRatio * drivetrainEff) / tireRadius;
+      if (isReverse) tractiveForce *= -1;
+
+    } else {
+      rpm = mechanicalRPM;
+      if (isCranking) rpm = Math.max(rpm, 300);
+      if (rpm < 10) rpm = 0;
+    }
+
+    let netForce = tractiveForce;
+    if (velocity > 0.05)        netForce -= (totalRes + brakeForce);
+    else if (velocity < -0.05)  netForce += (totalRes + brakeForce);
+
+    if (Math.abs(velocity) < 0.15 && braking && tractiveForce === 0) {
+      velocity  = 0;
+      netForce  = 0;
+    }
+
+    velocity += (netForce / mass) * dt;
+
+    if (!isReverse && velocity < 0) velocity = 0;
+    if (isReverse  && velocity > 0) velocity = 0;
+
+    /* AUTO SHIFT */
+    if (gear === 'D' && engineOn) {
+      const maxG = gearRatios.length;
+      if (rpm > REV_LIMIT - 300 && autoGear < maxG) {
+        autoGear++;
+      } else if (autoGear > 1) {
+        const lowerRatio = gearRatios[autoGear - 2] * finalDrive;
+        const expectedRPM = Math.abs(((velocity / tireRadius) * 60) / (Math.PI * 2)) * lowerRatio;
+        if (rpm < 2800 && expectedRPM < REDLINE_RPM - 500) autoGear--;
+      }
+    }
+  }
+
+  rpm      = Math.max(0, Math.min(MAX_RPM, rpm));
+  velocity = Math.max(-15, velocity); // cap reverse ~33 mph
+
+  /* ROTOR ANGLE */
+  rotorAngle += (rpm / MAX_RPM) * dt * 18;
+
+
+
+  /* SMOOTH DASH NEEDLES */
+  const activeTargets = !isSweeping;
+  const rawTemp = 70 + (redlineTimer / REDLINE_LIMIT_SEC) * 60;
+  const tRPM   = activeTargets && (engineOn || isCranking) ? rpm   : 0;
+  const tSpeed = activeTargets ? Math.abs(velocity * 2.23694) : 0;
+  const tOil   = activeTargets && engineOn ? actualOil  : 0;
+  const tTemp  = activeTargets && engineOn ? Math.max(70, rawTemp) : 0;
+  const tFuel  = activeTargets ? actualFuel : 0;
+  const tBoost = activeTargets && engineOn ? currentBoost : 0;
+
+  const ease = 0.08;
+  dashRPM   += (tRPM   - dashRPM)   * ease;
+  dashSpeed += (tSpeed - dashSpeed) * ease;
+  dashOil   += (tOil   - dashOil)   * ease;
+  dashTemp  += (tTemp  - dashTemp)  * ease;
+  dashFuel  += (tFuel  - dashFuel)  * ease;
+  dashBoost += (tBoost - dashBoost) * ease;
+}
+
+/* =====================================================
+   DRAW — ROTARY ENGINE  (realistic mechanical cross-section)
+   ===================================================== */
+const engC = document.getElementById('eng');
+const ec   = engC.getContext('2d');
+
+function drawRotaryEngine() {
+  const W=340, H=210, cx=170, cy=100;
+  ec.clearRect(0, 0, W, H);
+
+  const R=82, e=13; // epitrochoid params
+
+  // ---- 1. THICK CAST-IRON HOUSING (outer shell) ----
+  // Draw the housing wall as a thick band by stroking the trochoid with a wide line
+  ec.save();
+  ec.beginPath();
+  for (let i=0; i<=360; i++) {
+    const t=(i/360)*Math.PI*2;
+    ec.lineTo(cx + e*Math.cos(3*t)+R*Math.cos(t), cy + e*Math.sin(3*t)+R*Math.sin(t));
+  }
+  ec.closePath();
+  // Outer housing body — dark cast iron
+  ec.fillStyle='#252528';
+  ec.fill();
+  // Thick housing wall stroke
+  ec.strokeStyle='#3a3a3e';
+  ec.lineWidth=18;
+  ec.stroke();
+  ec.restore();
+
+  // ---- 2. INNER BORE (machined surface of housing) ----
+  ec.save();
+  ec.beginPath();
+  for (let i=0; i<=360; i++) {
+    const t=(i/360)*Math.PI*2;
+    ec.lineTo(cx + e*Math.cos(3*t)+R*Math.cos(t), cy + e*Math.sin(3*t)+R*Math.sin(t));
+  }
+  ec.closePath();
+  // Clip to inside
+  ec.clip();
+  // Machined bore surface — slightly lighter, brushed metal look
+  ec.beginPath();
+  for (let i=0; i<=360; i++) {
+    const t=(i/360)*Math.PI*2;
+    ec.lineTo(cx + e*Math.cos(3*t)+R*Math.cos(t), cy + e*Math.sin(3*t)+R*Math.sin(t));
+  }
+  ec.closePath();
+  ec.fillStyle='#1c1c1f';
+  ec.fill();
+  // Inner bore highlight — thin lighter ring to suggest machined finish
+  ec.strokeStyle='#323236';
+  ec.lineWidth=2;
+  ec.stroke();
+  ec.restore();
+
+  // ---- 3. PORT OPENINGS (intake left, exhaust right) ----
+  // Intake port — left lobe
+  ec.save();
+  ec.beginPath();
+  ec.ellipse(cx - 88, cy + 2, 9, 14, 0, 0, Math.PI*2);
+  ec.fillStyle='#111113';
+  ec.fill();
+  ec.strokeStyle='#2a2a2d';
+  ec.lineWidth=1;
+  ec.stroke();
+  ec.restore();
+
+  // Exhaust port — right lobe
+  ec.save();
+  ec.beginPath();
+  ec.ellipse(cx + 88, cy + 2, 9, 14, 0, 0, Math.PI*2);
+  ec.fillStyle='#111113';
+  ec.fill();
+  ec.strokeStyle='#2a2a2d';
+  ec.lineWidth=1;
+  ec.stroke();
+  ec.restore();
+
+  // ---- 4. SPARK PLUG BOSS (top of housing, machined boss) ----
+  // Boss protrusion
+  ec.save();
+  ec.beginPath();
+  ec.ellipse(cx + 58, cy - 60, 8, 8, -0.5, 0, Math.PI*2);
+  ec.fillStyle='#2e2e32';
+  ec.fill();
+  ec.strokeStyle='#484850';
+  ec.lineWidth=1.5;
+  ec.stroke();
+  // Spark plug ceramic — small white dot
+  ec.beginPath();
+  ec.arc(cx + 58, cy - 60, 3, 0, Math.PI*2);
+  ec.fillStyle='#c8c8cc';
+  ec.fill();
+  ec.restore();
+
+  // ---- 5. ROTOR (triangular, solid cast iron with concave faces) ----
+  const pts = [0,1,2].map(i => {
+    const ro=76, off=(i/3)*Math.PI*2+rotorAngle;
+    return [cx+ro*Math.cos(off), cy+ro*Math.sin(off)];
+  });
+
+  ec.save();
+  // Rotor shadow / depth
+  ec.beginPath();
+  ec.moveTo(pts[0][0]+1, pts[0][1]+2);
+  for (let i=0; i<3; i++) {
+    const p1=pts[i], p2=pts[(i+1)%3];
+    const mx=(p1[0]+p2[0])/2+1, my=(p1[1]+p2[1])/2+2;
+    const dx=p2[0]-p1[0], dy=p2[1]-p1[1], len=Math.sqrt(dx*dx+dy*dy);
+    const bow=-16;
+    ec.quadraticCurveTo(mx+bow*(-dy)/len, my+bow*dx/len, p2[0]+1, p2[1]+2);
+  }
+  ec.closePath();
+  ec.fillStyle='#111113';
+  ec.fill();
+  ec.restore();
+
+  // Rotor main body
+  ec.save();
+  ec.beginPath();
+  ec.moveTo(pts[0][0], pts[0][1]);
+  for (let i=0; i<3; i++) {
+    const p1=pts[i], p2=pts[(i+1)%3];
+    const mx=(p1[0]+p2[0])/2, my=(p1[1]+p2[1])/2;
+    const dx=p2[0]-p1[0], dy=p2[1]-p1[1], len=Math.sqrt(dx*dx+dy*dy);
+    const bow=-16;
+    ec.quadraticCurveTo(mx+bow*(-dy)/len, my+bow*dx/len, p2[0], p2[1]);
+  }
+  ec.closePath();
+  // Cast iron rotor body — dark warm gray
+  ec.fillStyle='#38383c';
+  ec.fill();
+  // Machined face edge
+  ec.strokeStyle='#555558';
+  ec.lineWidth=1.5;
+  ec.stroke();
+
+  // Face highlight — each concave face gets a subtle lighter center to suggest depth
+  for (let i=0; i<3; i++) {
+    const p1=pts[i], p2=pts[(i+1)%3];
+    const mx=(p1[0]+p2[0])/2, my=(p1[1]+p2[1])/2;
+    const dx=p2[0]-p1[0], dy=p2[1]-p1[1], len=Math.sqrt(dx*dx+dy*dy);
+    const bow=-16;
+    const faceCx = mx + (bow*0.5)*(-dy)/len;
+    const faceCy = my + (bow*0.5)*dx/len;
+    ec.beginPath();
+    ec.arc(faceCx, faceCy, 12, 0, Math.PI*2);
+    ec.fillStyle='#42424a';
+    ec.fill();
+  }
+  ec.restore();
+
+  // Rotor corner chamfers — small bevels at each corner tip
+  pts.forEach(([px,py]) => {
+    ec.save();
+    ec.beginPath();
+    ec.arc(px, py, 5, 0, Math.PI*2);
+    ec.fillStyle='#44444a';
+    ec.fill();
+    ec.strokeStyle='#606068';
+    ec.lineWidth=1;
+    ec.stroke();
+    ec.restore();
+  });
+
+  // ---- 6. APEX SEALS (rectangular spring-loaded tabs at each rotor tip) ----
+  for (let i=0; i<3; i++) {
+    const [px, py] = pts[i];
+    // Direction from rotor center to apex
+    const dx = px - cx, dy = py - cy;
+    const len = Math.sqrt(dx*dx+dy*dy);
+    const nx = dx/len, ny = dy/len;
+    // Perpendicular
+    const tx = -ny, ty = nx;
+
+    // Seal body (small rectangle, oriented outward)
+    ec.save();
+    ec.translate(px, py);
+    ec.rotate(Math.atan2(dy, dx));
+    // Seal tab — light grey, slightly proud of rotor surface
+    ec.fillStyle='#9a9a9e';
+    ec.fillRect(-3, -1.5, 8, 3);
+    ec.strokeStyle='#c0c0c4';
+    ec.lineWidth=0.5;
+    ec.strokeRect(-3, -1.5, 8, 3);
+    ec.restore();
+  }
+
+  // ---- 7. SIDE SEALS (two small tabs on each rotor face, near corners) ----
+  for (let i=0; i<3; i++) {
+    const p1=pts[i], p2=pts[(i+1)%3];
+    // Midpoint of each face edge
+    const mx=(p1[0]+p2[0])/2, my=(p1[1]+p2[1])/2;
+    const dx=p2[0]-p1[0], dy=p2[1]-p1[1], len=Math.sqrt(dx*dx+dy*dy);
+    // Quarter-point and three-quarter-point
+    for (const frac of [0.3, 0.7]) {
+      const sx = p1[0]+dx*frac, sy = p1[1]+dy*frac;
+      ec.save();
+      ec.translate(sx, sy);
+      ec.rotate(Math.atan2(dy, dx));
+      ec.fillStyle='#888890';
+      ec.fillRect(-2, -1, 4, 2);
+      ec.restore();
+    }
+  }
+
+  // ---- 8. ECCENTRIC SHAFT (output shaft through rotor center) ----
+  // Main shaft journal
+  ec.save();
+  ec.beginPath();
+  ec.arc(cx, cy, 17, 0, Math.PI*2);
+  ec.fillStyle='#2a2a2e';
+  ec.fill();
+  ec.strokeStyle='#505058';
+  ec.lineWidth=2;
+  ec.stroke();
+  ec.restore();
+
+  // Eccentric lobe (offset from shaft center, rotates 3x rotor angle)
+  const ecX = cx + 14*Math.cos(rotorAngle*3);
+  const ecY = cy + 14*Math.sin(rotorAngle*3);
+  ec.save();
+  ec.beginPath();
+  ec.arc(ecX, ecY, 9, 0, Math.PI*2);
+  ec.fillStyle='#484850';
+  ec.fill();
+  ec.strokeStyle='#707078';
+  ec.lineWidth=1.5;
+  ec.stroke();
+  ec.restore();
+
+  // Shaft bore center hole
+  ec.save();
+  ec.beginPath();
+  ec.arc(ecX, ecY, 4, 0, Math.PI*2);
+  ec.fillStyle='#18181c';
+  ec.fill();
+  ec.strokeStyle='#404048';
+  ec.lineWidth=1;
+  ec.stroke();
+  ec.restore();
+
+  // ---- 9. HOUSING OUTER EDGE (final clean outline) ----
+  ec.save();
+  ec.beginPath();
+  for (let i=0; i<=360; i++) {
+    const t=(i/360)*Math.PI*2;
+    ec.lineTo(cx + e*Math.cos(3*t)+R*Math.cos(t), cy + e*Math.sin(3*t)+R*Math.sin(t));
+  }
+  ec.closePath();
+  ec.strokeStyle='#505058';
+  ec.lineWidth=2;
+  ec.stroke();
+  ec.restore();
+
+  // ---- 10. PORT LABELS ----
+  ec.font='7px Rajdhani,sans-serif';
+  ec.fillStyle='#383840';
+  ec.textAlign='center';
+  ec.fillText('IN', cx-88, cy+22);
+  ec.fillText('EX', cx+88, cy+22);
+
+  // ---- 11. RPM BAR ----
+  const rpmPct = Math.min(1, rpm/MAX_RPM);
+  ec.fillStyle='#0f0f12'; ec.fillRect(0,190,W,20);
+  ec.fillStyle='#141418'; ec.fillRect(20,193,300,11);
+  const bw=Math.round(300*rpmPct);
+  if (bw>0) {
+    ec.fillStyle=rpm>REDLINE_RPM?'#882222':rpm>6000?'#7a4a00':'#555558';
+    ec.fillRect(20,193,bw,11);
+  }
+  ec.font='bold 7px Orbitron,monospace';
+  ec.fillStyle='#2a2a30'; ec.textAlign='left'; ec.fillText('0',22,202);
+  ec.textAlign='right'; ec.fillText('9K',318,202);
+  ec.textAlign='center'; ec.fillStyle='#383840'; ec.fillText('RPM',170,202);
+
+  // ---- 12. THROTTLE BAR ----
+  ec.fillStyle='#141418'; ec.fillRect(4,10,7,170);
+  if (throttle>0.01) {
+    const th=Math.round(170*throttle);
+    ec.fillStyle='#2a4a30'; ec.fillRect(4,180-th,7,th);
+  }
+  ec.font='7px Rajdhani,sans-serif'; ec.fillStyle='#303038'; ec.textAlign='center'; ec.fillText('T',7,8);
+}
+
+/* =====================================================
+   DRAW — LARGE ROUND GAUGE  (Mazda style)
+   ===================================================== */
+function drawRoundGauge(id, value, min, max, redFrom, unit, colorFn) {
+  const c  = document.getElementById(id).getContext('2d');
+  const cx=100, cy=110, r=78;
+  c.clearRect(0,0,200,200);
+
+  const startA = 225*Math.PI/180;
+  const sweep  = 270*Math.PI/180;
+
+  // Background track
+  c.beginPath(); c.arc(cx,cy,r,startA,startA+sweep);
+  c.strokeStyle='#1a1a22'; c.lineWidth=14; c.lineCap='round'; c.stroke();
+
+  // Redline zone
+  if (redFrom != null) {
+    const redA = startA + ((redFrom-min)/(max-min))*sweep;
+    c.beginPath(); c.arc(cx,cy,r,redA,startA+sweep);
+    c.strokeStyle='#3a0808'; c.lineWidth=14; c.stroke();
+  }
+
+  // Use sweep animation while sweeping
+  const dispVal = sweepVal(value, min, max);
+  const pct = Math.max(0,Math.min(1,(dispVal-min)/(max-min)));
+
+  // Value arc
+  if (pct > 0.001) {
+    c.beginPath(); c.arc(cx,cy,r,startA,startA+pct*sweep);
+    c.strokeStyle = colorFn ? colorFn(value) : '#f9a825';
+    c.lineWidth=10; c.lineCap='round'; c.stroke();
+  }
+
+  // Ticks
+  const majT = unit==='rpm' ? 9 : 8;
+  for (let i=0; i<=majT; i++) {
+    const ta = startA+(i/majT)*sweep;
+    const isRed = redFrom!=null && (min+(i/majT)*(max-min)) >= redFrom;
+    c.beginPath();
+    c.moveTo(cx+Math.cos(ta)*(r+10), cy+Math.sin(ta)*(r+10));
+    c.lineTo(cx+Math.cos(ta)*(r+18), cy+Math.sin(ta)*(r+18));
+    c.strokeStyle=isRed?'#882222':'#2e2e38'; c.lineWidth=1.5; c.stroke();
+
+    const lx=cx+Math.cos(ta)*(r+28), ly=cy+Math.sin(ta)*(r+28);
+    const tv = min+(i/majT)*(max-min);
+    c.font='bold 8px Orbitron,monospace';
+    c.fillStyle=isRed?'#662222':'#3a3a48';
+    c.textAlign='center'; c.textBaseline='middle';
+    c.fillText(unit==='rpm'?Math.round(tv/1000)+'k':Math.round(tv), lx, ly);
+  }
+  // Minor ticks
+  for (let i=0; i<=majT*2; i++) {
+    const ta=startA+(i/(majT*2))*sweep;
+    c.beginPath();
+    c.moveTo(cx+Math.cos(ta)*(r+13),cy+Math.sin(ta)*(r+13));
+    c.lineTo(cx+Math.cos(ta)*(r+17),cy+Math.sin(ta)*(r+17));
+    c.strokeStyle='#1e1e28'; c.lineWidth=1; c.stroke();
+  }
+
+  // Needle
+  const na = startA + pct*sweep;
+  c.beginPath();
+  c.moveTo(cx+(-10)*Math.cos(na), cy+(-10)*Math.sin(na));
+  c.lineTo(cx+(r-10)*Math.cos(na), cy+(r-10)*Math.sin(na));
+  c.strokeStyle='#ff3333'; c.lineWidth=2; c.lineCap='round'; c.stroke();
+
+  // Hub
+  c.beginPath(); c.arc(cx,cy,9,0,Math.PI*2); c.fillStyle='#1a1a22'; c.fill();
+  c.beginPath(); c.arc(cx,cy,4,0,Math.PI*2); c.fillStyle='#ff3333'; c.fill();
+}
+
+/* =====================================================
+   DRAW — MINI ARC GAUGE
+   ===================================================== */
+function drawMiniGauge(id, value, min, max, dangerFrom, color) {
+  const c = document.getElementById(id).getContext('2d');
+  const cx=60, cy=56, r=42;
+  c.clearRect(0,0,120,60);
+
+  const startA=Math.PI*0.85, sweep=Math.PI*1.3;
+
+  c.beginPath(); c.arc(cx,cy,r,startA,startA+sweep);
+  c.strokeStyle='#1a1a22'; c.lineWidth=9; c.lineCap='round'; c.stroke();
+
+  if (dangerFrom!=null) {
+    const dA=startA+((dangerFrom-min)/(max-min))*sweep;
+    c.beginPath(); c.arc(cx,cy,r,dA,startA+sweep);
+    c.strokeStyle='#3a0808'; c.lineWidth=9; c.stroke();
+  }
+
+  const dispVal = sweepVal(value, min, max);
+  const pct=Math.max(0,Math.min(1,(dispVal-min)/(max-min)));
+  if (pct>0.001) {
+    c.beginPath(); c.arc(cx,cy,r,startA,startA+pct*sweep);
+    c.strokeStyle=color||'#f9a825'; c.lineWidth=6; c.lineCap='round'; c.stroke();
+  }
+
+  const na=startA+pct*sweep;
+  c.beginPath(); c.arc(cx+r*Math.cos(na),cy+r*Math.sin(na),3.5,0,Math.PI*2);
+  c.fillStyle='#ddd'; c.fill();
+  c.beginPath(); c.arc(cx,cy,5,0,Math.PI*2); c.fillStyle='#2a2a35'; c.fill();
+}
+
+/* =====================================================
+   DRAW — ALL GAUGES + HUD
+   ===================================================== */
+function drawGauges() {
+  const spd = Math.abs(velocity * 2.23694);
+
+  drawRoundGauge('g-tacho', dashRPM,  0, MAX_RPM, REDLINE_RPM, 'rpm',
+    v => v>REDLINE_RPM?'#cc2222':v>6500?'#d06000':'#f9a825');
+
+  drawRoundGauge('g-speedo', dashSpeed, 0, 160, null, 'mph', () => '#4488cc');
+
+  // Boost
+  const bc = dashBoost>14?'#cc2222':dashBoost>8?'#d06000':'#8866cc';
+  drawMiniGauge('g-boost', dashBoost, 0, 20, 15, bc);
+  document.getElementById('v-boost').textContent = engineOn ? dashBoost.toFixed(1)+' psi' : '--';
+
+  // Temp
+  const tc = dashTemp>110?'#cc2222':dashTemp>90?'#d06000':'#2a8a60';
+  drawMiniGauge('g-temp', dashTemp, 60, 130, 110, tc);
+  document.getElementById('v-temp').textContent = engineOn ? Math.round(dashTemp)+'°C' : '--';
+
+  // Oil
+  const oc = (dashOil < 20 && engineOn)?'#cc2222':'#d08020';
+  drawMiniGauge('g-oil', dashOil, 0, 100, 20, oc);
+  document.getElementById('v-oil').textContent = engineOn ? Math.round(dashOil)+' %' : '--';
+
+  // Fuel
+  const fc = dashFuel<15?'#cc2222':dashFuel<30?'#d06000':'#2a6acc';
+  drawMiniGauge('g-fuel', dashFuel, 0, 100, 15, fc);
+  const fuelLabels=['E','1/4','1/2','3/4','F'];
+  document.getElementById('v-fuel').textContent =
+    isSweeping || engineOn || actualFuel > 0
+      ? fuelLabels[Math.min(4,Math.round(dashFuel/25))]
+      : '--';
+
+  // Center digital
+  const ignActive = engineOn || isCranking;
+  document.getElementById('mph-display').textContent   = ignActive ? Math.round(spd)    : '---';
+  document.getElementById('rpm-digital').textContent   = ignActive ? Math.round(dashRPM).toLocaleString()+' RPM' : '--- RPM';
+  document.getElementById('drive-gear-display').textContent =
+    (gearIndex === 3 && engineOn) ? 'GEAR ' + autoGear : '';
+
+  // Warning lights
+  document.getElementById('w-oil').classList.toggle('on',    engineOn && actualOil < 20);
+  document.getElementById('w-temp').classList.toggle('on',   dashTemp > 112 || isOverheated);
+  document.getElementById('w-fuel').classList.toggle('on',   actualFuel < 10);
+  document.getElementById('w-overheat').classList.toggle('on', isOverheated);
+}
+
+/* =====================================================
+   MAIN LOOP
+   ===================================================== */
+function loop(ts) {
+  const dt = Math.min((ts - lastT) / 1000, 0.05);
+  lastT = ts;
+  update(dt);
+  drawRotaryEngine();
+  drawGauges();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(ts => { lastT = ts; loop(ts); });
+
+updatePRND();
+document.getElementById('sim').focus();
+</script>
+</body>
+</html>
