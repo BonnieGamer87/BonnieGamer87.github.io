@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mazda RX-7 Rotary Sim</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* RX-7 FD cluster: near-black bezel, warm amber/red illumination */
+:root{
+  --amber:#e8720a;
+  --amber-dim:#7a3a04;
+  --amber-glow:#ff9030;
+  --red-needle:#ff2020;
+  --cluster-bg:#050404;
+  --bezel:#0e0a08;
+  --face-bg:#080604;
+  --face-ring:#2a1a08;
+  --text-amber:#c86010;
+  --text-dim:#3a1e08;
+}
+
+body{background:#030203;display:flex;justify-content:center;padding:20px;min-height:100vh;font-family:'Rajdhani',sans-serif;}
+#sim{width:100%;max-width:820px;background:var(--bezel);border-radius:20px;border:2px solid #1a1008;padding:14px;outline:none;box-shadow:0 0 40px rgba(0,0,0,.8);}
+
+/* WARN BAR */
+#warn-bar{display:flex;gap:8px;justify-content:center;margin-bottom:8px;height:20px;align-items:center;}
+.warn{font-family:'Orbitron',monospace;font-size:8px;padding:2px 8px;border-radius:2px;opacity:0;transition:opacity .3s;letter-spacing:.1em;font-weight:700;}
+.warn.on{opacity:1;animation:warnblink 0.7s ease-in-out infinite;}
+@keyframes warnblink{0%,100%{opacity:1}50%{opacity:.2}}
+#w-oil{background:#2a1200;color:#e8720a;border:1px solid #e8720a;}
+#w-temp{background:#200808;color:#ff4422;border:1px solid #ff4422;}
+#w-fuel{background:#0a1020;color:#4499ff;border:1px solid #4499ff;}
+#w-overheat{background:#300505;color:#ff2020;border:1px solid #ff2020;font-size:8px;}
+
+/* ENGINE */
+#engine-row{display:flex;justify-content:center;margin-bottom:10px;}
+canvas#eng{border-radius:8px;background:#0a0808;border:1px solid #1a1008;display:block;}
+
+/* STATUS TEXT */
+#status-line{text-align:center;height:16px;margin-bottom:6px;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:.12em;color:var(--amber);transition:color .3s;}
+
+/* PRND — RX-7 style horizontal selector */
+#prnd-row{display:flex;align-items:center;justify-content:center;margin-bottom:10px;background:#0a0806;border-radius:6px;border:1px solid #1a1008;padding:7px 14px;gap:4px;}
+.prnd-sep{width:1px;height:24px;background:#1e1208;margin:0 5px;}
+.gear-pill{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;letter-spacing:.06em;color:#1e1206;padding:5px 16px;border-radius:4px;cursor:pointer;transition:all .15s;border:1px solid transparent;background:transparent;user-select:none;}
+.gear-pill:hover{color:#3a2010;}
+.gear-pill.active-P{color:#d8d0c8;background:#161210;border-color:#3a3028;}
+.gear-pill.active-R{color:#ff6644;background:#180a06;border-color:#602010;}
+.gear-pill.active-N{color:#e8a020;background:#160e02;border-color:#503806;}
+.gear-pill.active-D{color:#e8720a;background:#140a02;border-color:#603008;}
+#start-btn{margin-left:auto;font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--amber);background:#120a02;border:1px solid #502808;border-radius:4px;padding:6px 14px;cursor:pointer;transition:all .2s;}
+#start-btn:hover{background:#1c1004;border-color:var(--amber);}
+#start-btn.running{color:#ff3020;background:#140404;border-color:#601010;}
+#start-btn.running:hover{border-color:#ff3020;}
+#start-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+/* ============================================================
+   CLUSTER — replicates RX-7 FD instrument panel photo exactly
+   Left column: 2×2 small round gauges
+   Right area:  large tacho + speedo side by side
+   ============================================================ */
+#cluster{
+  background:#050302;
+  border-radius:10px;
+  border:2px solid #1e1208;
+  padding:10px 8px 8px;
+  position:relative;
+  /* subtle inner bevel to mimic the plastic dash surround */
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.7), inset 0 -1px 4px rgba(0,0,0,.5);
+}
+
+/* The cluster inner panel — dark brushed surface */
+#cluster-inner{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:#030201;
+  border-radius:8px;
+  padding:8px 6px;
+  border:1px solid #120a04;
+}
+
+/* LEFT COL — 2×2 small gauges */
+#mini-gauges{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr;
+  gap:5px;
+  flex-shrink:0;
+}
+.mini-gauge-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  background:#070503;
+  border-radius:50%;          /* round bezel look */
+  border:2px solid #2a1e10;
+  padding:3px;
+  box-shadow:0 0 6px rgba(0,0,0,.8), inset 0 1px 3px rgba(255,160,60,.05);
+  width:88px; height:88px;
+  justify-content:center;
+}
+canvas.mini-gauge{display:block;}
+.glabel{
+  font-family:'Rajdhani',sans-serif;
+  font-size:7.5px;letter-spacing:.08em;
+  text-transform:uppercase;
+  color:#4a2c10;margin-top:1px;
+  text-align:center;
+}
+.gval{
+  font-family:'Orbitron',monospace;
+  font-size:9px;font-weight:400;
+  color:#c07830;margin-top:0px;
+  text-align:center;
+}
+
+/* RIGHT — big gauges side by side */
+#big-gauges{
+  display:flex;
+  gap:4px;
+  align-items:center;
+  flex:1;
+  justify-content:center;
+}
+.round-gauge-wrap{display:flex;flex-direction:column;align-items:center;}
+canvas.round-gauge{display:block;}
+.gauge-label-big{
+  font-family:'Rajdhani',sans-serif;
+  font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;
+  color:#3a2010;margin-top:2px;
+}
+
+/* DIGITAL readout strip — sits BELOW cluster, like the FD's odometer strip */
+#digital-strip{
+  display:flex;align-items:center;justify-content:space-between;
+  background:#030201;
+  border-radius:0 0 8px 8px;
+  border-top:1px solid #120a04;
+  padding:5px 12px 4px;
+  margin-top:0;
+}
+#gear-display{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:#d07828;line-height:1;letter-spacing:-.01em;}
+#mph-block{display:flex;flex-direction:column;align-items:center;}
+#mph-display{font-family:'Orbitron',monospace;font-size:20px;font-weight:700;color:#c8b898;line-height:1;}
+#mph-unit{font-family:'Rajdhani',sans-serif;font-size:8px;color:#3a2010;letter-spacing:.1em;}
+#rpm-digital{font-family:'Orbitron',monospace;font-size:11px;color:#7a4020;letter-spacing:.04em;}
+#drive-gear-display{font-family:'Orbitron',monospace;font-size:10px;color:#e8720a;letter-spacing:.06em;min-height:12px;}
+
+/* INFO BAR */
+#info-bar{display:flex;gap:14px;justify-content:center;padding:7px 0 2px;border-top:1px solid #120a04;margin-top:8px;flex-wrap:wrap;}
+.info-item{font-family:'Rajdhani',sans-serif;font-size:10px;color:#2a1808;letter-spacing:.06em;text-transform:uppercase;}
+.info-item b{color:#4a2e14;font-weight:600;}
+</style>
+</head>
+<body>
+<div id="sim" tabindex="0">
+
+  <div id="warn-bar">
+    <div class="warn" id="w-oil">OIL PRES</div>
+    <div class="warn" id="w-temp">OVERHEAT</div>
+    <div class="warn" id="w-fuel">NO FUEL</div>
+    <div class="warn" id="w-overheat">ENGINE OVERHEATED — PRESS ENTER TO RESET</div>
+  </div>
+
+  <div id="engine-row">
+    <canvas id="eng" width="340" height="210"></canvas>
+  </div>
+
+  <div id="status-line" id="status-line"></div>
+
+  <div id="prnd-row">
+    <span class="gear-pill active-P" id="gb-p">P</span>
+    <div class="prnd-sep"></div>
+    <span class="gear-pill" id="gb-r">R</span>
+    <div class="prnd-sep"></div>
+    <span class="gear-pill" id="gb-n">N</span>
+    <div class="prnd-sep"></div>
+    <span class="gear-pill" id="gb-d">D</span>
+    <button id="start-btn">START</button>
+  </div>
+
+  <div id="cluster">
+    <div id="cluster-inner">
+
+      <!-- LEFT: 2×2 small round gauges -->
+      <div id="mini-gauges">
+        <div class="mini-gauge-wrap">
+          <canvas class="mini-gauge" id="g-boost" width="76" height="76"></canvas>
+          <div class="glabel">Boost</div>
+          <div class="gval" id="v-boost">--</div>
+        </div>
+        <div class="mini-gauge-wrap">
+          <canvas class="mini-gauge" id="g-temp" width="76" height="76"></canvas>
+          <div class="glabel">Temp °F</div>
+          <div class="gval" id="v-temp">--</div>
+        </div>
+        <div class="mini-gauge-wrap">
+          <canvas class="mini-gauge" id="g-oil" width="76" height="76"></canvas>
+          <div class="glabel">Oil</div>
+          <div class="gval" id="v-oil">--</div>
+        </div>
+        <div class="mini-gauge-wrap">
+          <canvas class="mini-gauge" id="g-fuel" width="76" height="76"></canvas>
+          <div class="glabel">Fuel</div>
+          <div class="gval" id="v-fuel">--</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Large tacho + speedo -->
+      <div id="big-gauges">
+        <div class="round-gauge-wrap">
+          <canvas class="round-gauge" id="g-tacho" width="220" height="220"></canvas>
+          <div class="gauge-label-big">×1000 RPM</div>
+        </div>
+        <div class="round-gauge-wrap">
+          <canvas class="round-gauge" id="g-speedo" width="220" height="220"></canvas>
+          <div class="gauge-label-big">MPH</div>
+        </div>
+      </div>
+
+    </div><!-- /cluster-inner -->
+
+    <!-- DIGITAL STRIP — below gauges like FD odometer area -->
+    <div id="digital-strip">
+      <div id="gear-display">P</div>
+      <div id="drive-gear-display"></div>
+      <div id="mph-block">
+        <div id="mph-display">---</div>
+        <div id="mph-unit">MPH</div>
+      </div>
+      <div id="rpm-digital">--- RPM</div>
+    </div>
+
+  </div>
+
+  <div id="info-bar">
+    <div class="info-item"><b>W</b> Throttle</div>
+    <div class="info-item"><b>S</b> Brake</div>
+    <div class="info-item"><b>Q/E</b> Shift PRND</div>
+    <div class="info-item"><b>G</b> Start / Stop</div>
+    <div class="info-item"><b>Enter</b> Reset engine</div>
+  </div>
+
+</div>
+<script>
+/* =====================================================
+   VEHICLE STATE
+   ===================================================== */
+const GEAR_NAMES = ['P','R','N','D'];
+let gearIndex = 0;          // 0=P 1=R 2=N 3=D
+let engineOn = false;
+let isCranking = false;
+let crankTimer = 0;
+let isOverheated = false;
+
+/* Physics */
+let velocity = 0;           // m/s (signed, negative = reverse)
+let rpm = 0;
+let throttle = 0;
+let braking = false;
+let currentBoost = 0;
+let rotorAngle = 0;
+let lastT = 0;
+
+/* Consumables */
+let actualFuel = 100;
+let actualOil  = 100;
+
+/* Smooth dash needles */
+let dashRPM = 0, dashSpeed = 0, dashOil = 0, dashTemp = 0, dashFuel = 0, dashBoost = 0;
+
+/* Overheat / redline timer */
+let redlineTimer = 0;
+const REDLINE_LIMIT_SEC = 30;
+
+/* Needle sweep on ignition */
+let isSweeping = false;
+let sweepTimer = 0;
+const SWEEP_DURATION = 1.5;
+
+/* Auto transmission — 8-speed */
+let autoGear = 1;
+const gearRatios   = [4.17, 2.34, 1.52, 1.14, 0.87, 0.69, 0.58, 0.48];
+const finalDrive   = 3.73;
+
+/* =====================================================
+   ENGINE / PHYSICS CONSTANTS  (RX-7 13B-REW)
+   ===================================================== */
+const IDLE_RPM    = 900;
+const MAX_RPM     = 9000;
+const REDLINE_RPM = 7500;
+const REV_LIMIT   = 8200;
+
+/* Vehicle physics */
+const mass               = 1260;   // kg (RX-7 FD weight)
+const tireRadius         = 0.315;  // m
+const drivetrainEff      = 0.87;
+const dragCoeff          = 0.29;
+const frontalArea        = 1.8;
+const airDensity         = 1.225;
+const rollingRes         = 0.013;
+const gravity            = 9.81;
+
+/* =====================================================
+   13B-REW TORQUE CURVE
+   Peak ~280 Nm @ ~5000 rpm with twin-turbo boost
+   ===================================================== */
+function getTorque(r) {
+  if (!engineOn) return 0;
+  const boostMult = 1.0 + (currentBoost / 14.7);
+  // Rotary torque: flat mid-range, falls off at top
+  const base = 250 * boostMult * Math.exp(-Math.pow((r - 5500) / 3000, 2));
+  return base * 1.0;   // Nm
+}
+
+/* =====================================================
+   INPUT
+   ===================================================== */
+const keys = {};
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = true;
+
+  if (e.key === 'Enter') {
+    // Reset engine after overheat
+    isOverheated = false;
+    redlineTimer = 0;
+    actualFuel   = 100;
+    actualOil    = 100;
+    engineOn     = false;
+    isCranking   = false;
+    rpm          = 0;
+    updateStartBtn();
+  }
+
+  if (!e.repeat) {
+    if (k === 'g') toggleEngine();
+    if (k === 'e') shiftUp();
+    if (k === 'q') shiftDown();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function shiftUp()   { if (gearIndex < 3) setGear(gearIndex + 1); }
+function shiftDown() { if (gearIndex > 0) setGear(gearIndex - 1); }
+
+/* =====================================================
+   ENGINE START / STOP
+   ===================================================== */
+function toggleEngine() {
+  if (engineOn) {
+    // Stop
+    engineOn  = false;
+    isCranking = false;
+    crankTimer = 0;
+    updateStartBtn();
+    return;
+  }
+  if (isOverheated) return;
+  if (actualFuel <= 0) return;
+  // Can only start in P or N
+  if (gearIndex !== 0 && gearIndex !== 2) {
+    setStatus('SHIFT TO P OR N', '#f90');
+    return;
+  }
+  // Begin crank sequence
+  isCranking = true;
+  crankTimer = 0;
+  isSweeping = true;
+  sweepTimer = 0;
+  setStatus('CRANKING...', '#fa0');
+  updateStartBtn();
+}
+
+function updateStartBtn() {
+  const btn = document.getElementById('start-btn');
+  if (engineOn) {
+    btn.textContent = 'STOP';
+    btn.classList.add('running');
+    btn.disabled = false;
+  } else if (isCranking) {
+    btn.textContent = 'CRANK...';
+    btn.classList.remove('running');
+    btn.disabled = true;
+  } else {
+    btn.textContent = 'START';
+    btn.classList.remove('running');
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('start-btn').addEventListener('click', e => { e.stopPropagation(); toggleEngine(); });
+['p','r','n','d'].forEach((n,i) => {
+  document.getElementById('gb-'+n).addEventListener('click', e => { e.stopPropagation(); setGear(i); });
+});
+
+/* =====================================================
+   GEAR SELECTOR
+   ===================================================== */
+function setGear(g) {
+  if (!engineOn && !isCranking && g !== 0) return;
+  gearIndex = g;
+  if (g === 3) autoGear = 1;
+  updatePRND();
+}
+
+function updatePRND() {
+  ['p','r','n','d'].forEach((n,i) => {
+    const el = document.getElementById('gb-'+n);
+    el.className = 'gear-pill' + (gearIndex === i ? ' active-'+n.toUpperCase() : '');
+  });
+  const colors = ['#eee','#f66','#fa0','#4f8'];
+  const gd = document.getElementById('gear-display');
+  gd.textContent = GEAR_NAMES[gearIndex];
+  gd.style.color  = colors[gearIndex];
+}
+
+/* =====================================================
+   STATUS LINE
+   ===================================================== */
+let statusTimer = 0;
+function setStatus(msg, color) {
+  const el = document.getElementById('status-line');
+  el.textContent = msg;
+  el.style.color = color || '#f90';
+  statusTimer = 2.5;
+}
+
+/* =====================================================
+   SWEEP HELPER  (0 -> max -> 0 on ignition)
+   ===================================================== */
+function sweepVal(real, min, max) {
+  if (!isSweeping) return real;
+  const t = sweepTimer / SWEEP_DURATION;
+  if (t < 0.5) return min + (t * 2) * (max - min);
+  return max - ((t - 0.5) * 2) * (max - min);
+}
+
+/* =====================================================
+   MAIN UPDATE
+   ===================================================== */
+const DT = 1 / 60;
+
+function update(dt) {
+  /* throttle & brake */
+  if (keys['w'] && engineOn && gearIndex !== 0 && gearIndex !== 2) {
+    throttle = Math.min(1, throttle + dt * 4);
+  } else if (keys['w'] && engineOn && (gearIndex === 0 || gearIndex === 2)) {
+    // Rev in P or N
+    throttle = Math.min(1, throttle + dt * 4);
+  } else {
+    throttle = Math.max(0, throttle - dt * 5);
+  }
+  braking = !!keys['s'];
+
+  /* status line decay */
+  if (statusTimer > 0) {
+    statusTimer -= dt;
+    if (statusTimer <= 0) document.getElementById('status-line').textContent = '';
+  }
+
+  /* CRANKING → START */
+  if (isCranking && !engineOn) {
+    crankTimer += dt;
+    rpm = Math.min(rpm + 400 * dt, 500); // cranking rpm
+    if (crankTimer >= 1.4) {
+      isCranking = false;
+      engineOn   = true;
+      rpm        = IDLE_RPM * 0.6;
+      setStatus('ENGINE RUNNING', '#4f8');
+      updateStartBtn();
+    }
+  }
+
+  /* SWEEP TIMER */
+  if (isSweeping) {
+    sweepTimer += dt;
+    if (sweepTimer >= SWEEP_DURATION) isSweeping = false;
+  }
+
+  /* CONSUMABLES */
+  if (engineOn) {
+    actualFuel = Math.max(0, actualFuel - (0.08 + throttle * 1.2) * dt);
+    actualOil  = Math.max(0, actualOil  - (0.03 + (rpm / MAX_RPM) * 0.3) * dt);
+
+    if (actualFuel <= 0) {
+      engineOn = false;
+      setStatus('OUT OF FUEL', '#f44');
+      updateStartBtn();
+    }
+    if (actualOil <= 0) redlineTimer += dt * 4; // accelerate damage with no oil
+  }
+
+  /* TURBO BOOST */
+  if (engineOn) {
+    let targetBoost = 0;
+    if (throttle > 0.1 && rpm > 2500) {
+      targetBoost = Math.min(18, ((rpm - 2500) / 4500) * 18 * throttle);
+    }
+    currentBoost += (targetBoost - currentBoost) * (throttle > 0 ? 0.025 : 0.1);
+    if (currentBoost < 0.05) currentBoost = 0;
+  } else {
+    currentBoost *= 0.8;
+  }
+
+  /* REDLINE / OVERHEAT */
+  if (isOverheated) {
+    redlineTimer = Math.max(0, redlineTimer - dt * 0.4);
+    if (redlineTimer <= 0) { isOverheated = false; }
+  } else if (engineOn) {
+    if (rpm >= REV_LIMIT) rpm = REV_LIMIT - (Math.random() * 200 + 50);
+    if (rpm >= REDLINE_RPM) {
+      redlineTimer += dt;
+      if (redlineTimer >= REDLINE_LIMIT_SEC) {
+        isOverheated = true;
+        engineOn     = false;
+        setStatus('ENGINE SEIZED — ENTER TO RESET', '#f22');
+        updateStartBtn();
+      }
+    } else {
+      redlineTimer = Math.max(0, redlineTimer - dt * 0.6);
+    }
+  }
+
+  /* RPM & VELOCITY PHYSICS */
+  const gear     = GEAR_NAMES[gearIndex];
+  const engineJitter = engineOn ? Math.sin(Date.now() / 120) * 12 : 0;
+
+  let tractiveForce = 0;
+  const aeroDrag    = 0.5 * airDensity * dragCoeff * frontalArea * velocity * velocity;
+  const rollDrag    = (Math.abs(velocity) > 0.1) ? rollingRes * mass * gravity : 0;
+  const totalRes    = aeroDrag + rollDrag;
+  const brakeForce  = braking ? 12000 : 0;
+
+  if (gear === 'P' || gear === 'N') {
+    /* Rev freely */
+    if (engineOn) {
+      const targetRPM = IDLE_RPM + engineJitter + throttle * (MAX_RPM - IDLE_RPM);
+      rpm += (targetRPM - rpm) * 0.06;
+    } else if (!isCranking) {
+      rpm *= 0.96;
+      if (rpm < 10) rpm = 0;
+    }
+    /* Slow coast to stop */
+    if (velocity > 0)      velocity -= ((totalRes + brakeForce) / mass) * dt;
+    else if (velocity < 0) velocity += ((totalRes + brakeForce) / mass) * dt;
+    if (Math.abs(velocity) < 0.15 && braking) velocity = 0;
+
+  } else if (gear === 'D' || gear === 'R') {
+    const isReverse       = (gear === 'R');
+    const activeRatio     = isReverse ? 2.90 : gearRatios[autoGear - 1];
+    const totalRatio      = activeRatio * finalDrive;
+
+    const wheelRad        = velocity / tireRadius;
+    const mechanicalRPM   = Math.abs((wheelRad * 60) / (Math.PI * 2)) * totalRatio;
+
+    if (engineOn) {
+      const stallSpeed  = 1400;
+      const targetRPM   = Math.max(IDLE_RPM + engineJitter, mechanicalRPM + stallSpeed * throttle);
+      rpm              += (targetRPM - rpm) * 0.14;
+
+      let slipFactor = 1.0;
+      if (mechanicalRPM < stallSpeed) {
+        slipFactor = 1.0 + ((stallSpeed - mechanicalRPM) / stallSpeed) * throttle;
+      }
+
+      const engineTorque = getTorque(rpm) * throttle;
+      tractiveForce = (engineTorque * slipFactor * totalRatio * drivetrainEff) / tireRadius;
+      if (isReverse) tractiveForce *= -1;
+
+    } else {
+      rpm = mechanicalRPM;
+      if (isCranking) rpm = Math.max(rpm, 300);
+      if (rpm < 10) rpm = 0;
+    }
+
+    let netForce = tractiveForce;
+    if (velocity > 0.05)        netForce -= (totalRes + brakeForce);
+    else if (velocity < -0.05)  netForce += (totalRes + brakeForce);
+
+    if (Math.abs(velocity) < 0.15 && braking && tractiveForce === 0) {
+      velocity  = 0;
+      netForce  = 0;
+    }
+
+    velocity += (netForce / mass) * dt;
+
+    if (!isReverse && velocity < 0) velocity = 0;
+    if (isReverse  && velocity > 0) velocity = 0;
+
+    /* AUTO SHIFT — 8 gears */
+    if (gear === 'D' && engineOn) {
+      const maxG = gearRatios.length;
+      if (rpm > REV_LIMIT - 300 && autoGear < maxG) {
+        autoGear++;
+      } else if (autoGear > 1) {
+        const lowerRatio = gearRatios[autoGear - 2] * finalDrive;
+        const expectedRPM = Math.abs(((velocity / tireRadius) * 60) / (Math.PI * 2)) * lowerRatio;
+        if (rpm < 2800 && expectedRPM < REDLINE_RPM - 500) autoGear--;
+      }
+    }
+  }
+
+  rpm      = Math.max(0, Math.min(MAX_RPM, rpm));
+  velocity = Math.max(-15, velocity); // cap reverse ~33 mph
+
+  /* ROTOR ANGLE */
+  rotorAngle += (rpm / MAX_RPM) * dt * 18;
+
+
+
+  /* SMOOTH DASH NEEDLES */
+  const activeTargets = !isSweeping;
+  const rawTemp = 70 + (redlineTimer / REDLINE_LIMIT_SEC) * 60;
+  const tRPM   = activeTargets && (engineOn || isCranking) ? rpm   : 0;
+  const tSpeed = activeTargets ? Math.abs(velocity * 2.23694) : 0;
+  const tOil   = activeTargets && engineOn ? actualOil  : 0;
+  const tTemp  = activeTargets && engineOn ? Math.max(70, rawTemp) : 0;
+  const tFuel  = activeTargets ? actualFuel : 0;
+  const tBoost = activeTargets && engineOn ? currentBoost : 0;
+
+  const ease = 0.08;
+  dashRPM   += (tRPM   - dashRPM)   * ease;
+  dashSpeed += (tSpeed - dashSpeed) * ease;
+  dashOil   += (tOil   - dashOil)   * ease;
+  dashTemp  += (tTemp  - dashTemp)  * ease;
+  dashFuel  += (tFuel  - dashFuel)  * ease;
+  dashBoost += (tBoost - dashBoost) * ease;
+}
+
+/* =====================================================
+   DRAW — ROTARY ENGINE  (static housing cached, rotor dynamic)
+   ===================================================== */
+const engC = document.getElementById('eng');
+const ec   = engC.getContext('2d');
+const W_ENG=340, H_ENG=210, CX=170, CY=100, R_ENG=82, E_ENG=13;
+
+/* Build the static housing once into an offscreen canvas */
+let _engHousing = null;
+function buildEngineHousing() {
+  const oc = document.createElement('canvas');
+  oc.width=W_ENG; oc.height=H_ENG;
+  const c = oc.getContext('2d');
+  const cx=CX, cy=CY, R=R_ENG, e=E_ENG;
+
+  // Trochoid path helper (reused below)
+  function tPath() {
+    c.beginPath();
+    for (let i=0; i<=360; i++) {
+      const t=(i/360)*Math.PI*2;
+      c.lineTo(cx+e*Math.cos(3*t)+R*Math.cos(t), cy+e*Math.sin(3*t)+R*Math.sin(t));
+    }
+    c.closePath();
+  }
+
+  // Housing fill
+  tPath(); c.fillStyle='#252528'; c.fill();
+  c.strokeStyle='#3a3a3e'; c.lineWidth=18; c.stroke();
+
+  // Inner bore
+  c.save(); tPath(); c.clip();
+  tPath(); c.fillStyle='#1c1c1f'; c.fill();
+  c.strokeStyle='#323236'; c.lineWidth=2; c.stroke();
+  c.restore();
+
+  // Ports
+  [[cx-88,cy+2],[cx+88,cy+2]].forEach(([px,py]) => {
+    c.beginPath(); c.ellipse(px,py,9,14,0,0,Math.PI*2);
+    c.fillStyle='#111113'; c.fill();
+    c.strokeStyle='#2a2a2d'; c.lineWidth=1; c.stroke();
+  });
+
+  // Spark plug boss
+  c.beginPath(); c.ellipse(cx+58,cy-60,8,8,-0.5,0,Math.PI*2);
+  c.fillStyle='#2e2e32'; c.fill();
+  c.strokeStyle='#484850'; c.lineWidth=1.5; c.stroke();
+  c.beginPath(); c.arc(cx+58,cy-60,3,0,Math.PI*2);
+  c.fillStyle='#c8c8cc'; c.fill();
+
+  // Housing outer outline
+  tPath(); c.strokeStyle='#505058'; c.lineWidth=2; c.stroke();
+
+  // Port labels
+  c.font='7px Rajdhani,sans-serif'; c.fillStyle='#383840'; c.textAlign='center';
+  c.fillText('IN',cx-88,cy+22); c.fillText('EX',cx+88,cy+22);
+
+  // Throttle bar background
+  c.fillStyle='#141418'; c.fillRect(4,10,7,170);
+  c.font='7px Rajdhani,sans-serif'; c.fillStyle='#303038'; c.textAlign='center';
+  c.fillText('T',7,8);
+
+  return oc;
+}
+
+function drawRotaryEngine() {
+  if (!_engHousing) _engHousing = buildEngineHousing();
+
+  const cx=CX, cy=CY;
+  ec.clearRect(0,0,W_ENG,H_ENG);
+  ec.drawImage(_engHousing,0,0);
+
+  // Compute rotor corner points
+  const pts = [0,1,2].map(i => {
+    const off=(i/3)*Math.PI*2+rotorAngle;
+    return [cx+76*Math.cos(off), cy+76*Math.sin(off)];
+  });
+
+  // Inline rotor path builder (no closure overhead)
+  function rPath(ox,oy,bow) {
+    ec.beginPath();
+    ec.moveTo(pts[0][0]+ox, pts[0][1]+oy);
+    for (let i=0;i<3;i++) {
+      const p1=pts[i], p2=pts[(i+1)%3];
+      const dx=p2[0]-p1[0], dy=p2[1]-p1[1];
+      const inv=1/Math.sqrt(dx*dx+dy*dy);
+      const nx=-dy*inv, ny=dx*inv;
+      ec.bezierCurveTo(
+        p1[0]+ox+dx*0.25+bow*nx, p1[1]+oy+dy*0.25+bow*ny,
+        p1[0]+ox+dx*0.75+bow*nx, p1[1]+oy+dy*0.75+bow*ny,
+        p2[0]+ox, p2[1]+oy
+      );
+    }
+    ec.closePath();
+  }
+
+  // Shadow + body in two fills, one stroke
+  rPath(2,3,-20); ec.fillStyle='#0c0c0e'; ec.fill();
+  rPath(0,0,-20); ec.fillStyle='#3c3c40'; ec.fill();
+  ec.strokeStyle='#585860'; ec.lineWidth=1.5; ec.stroke();
+
+  // All 3 face-edge highlights in one path
+  ec.beginPath();
+  for (let i=0;i<3;i++) {
+    const p1=pts[i], p2=pts[(i+1)%3];
+    const dx=p2[0]-p1[0], dy=p2[1]-p1[1];
+    const inv=1/Math.sqrt(dx*dx+dy*dy), bow=-20;
+    ec.moveTo(p1[0],p1[1]);
+    ec.bezierCurveTo(
+      p1[0]+dx*.25+bow*(-dy*inv), p1[1]+dy*.25+bow*(dx*inv),
+      p1[0]+dx*.75+bow*(-dy*inv), p1[1]+dy*.75+bow*(dx*inv),
+      p2[0], p2[1]
+    );
+  }
+  ec.strokeStyle='rgba(110,108,112,0.5)'; ec.lineWidth=1; ec.stroke();
+
+  // Apex seals — 3 rects, no save/restore (use setTransform)
+  for (let i=0;i<3;i++) {
+    const [px,py]=pts[i];
+    const ang=Math.atan2(py-cy,px-cx);
+    const cos=Math.cos(ang), sin=Math.sin(ang);
+    ec.setTransform(cos,sin,-sin,cos,px,py);
+    ec.fillStyle='#aaaaae'; ec.fillRect(-1.5,-2,9,4);
+    ec.strokeStyle='#d0d0d4'; ec.lineWidth=0.5; ec.strokeRect(-1.5,-2,9,4);
+  }
+  ec.setTransform(1,0,0,1,0,0); // reset
+
+  // Side seals — 6 rects
+  for (let i=0;i<3;i++) {
+    const p1=pts[i], p2=pts[(i+1)%3];
+    const dx=p2[0]-p1[0], dy=p2[1]-p1[1];
+    const ang=Math.atan2(dy,dx), cos=Math.cos(ang), sin=Math.sin(ang);
+    for (const f of [0.3,0.7]) {
+      ec.setTransform(cos,sin,-sin,cos, p1[0]+dx*f, p1[1]+dy*f);
+      ec.fillStyle='#888890'; ec.fillRect(-2,-1,4,2);
+    }
+  }
+  ec.setTransform(1,0,0,1,0,0);
+
+  // Eccentric shaft — 3 arcs, batched fills
+  const ecX=cx+14*Math.cos(rotorAngle*3), ecY=cy+14*Math.sin(rotorAngle*3);
+  ec.beginPath(); ec.arc(cx,cy,17,0,Math.PI*2);
+  ec.fillStyle='#2a2a2e'; ec.fill();
+  ec.strokeStyle='#505058'; ec.lineWidth=2; ec.stroke();
+  ec.beginPath(); ec.arc(ecX,ecY,9,0,Math.PI*2);
+  ec.fillStyle='#484850'; ec.fill();
+  ec.strokeStyle='#707078'; ec.lineWidth=1.5; ec.stroke();
+  ec.beginPath(); ec.arc(ecX,ecY,4,0,Math.PI*2);
+  ec.fillStyle='#18181c'; ec.fill();
+
+  // RPM bar
+  const bw=Math.round(300*Math.min(1,rpm/MAX_RPM));
+  ec.fillStyle='#0f0f12'; ec.fillRect(0,190,W_ENG,20);
+  ec.fillStyle='#141418'; ec.fillRect(20,193,300,11);
+  if (bw>0) {
+    ec.fillStyle=rpm>REDLINE_RPM?'#882222':rpm>6000?'#7a4a00':'#555558';
+    ec.fillRect(20,193,bw,11);
+  }
+  ec.font='bold 7px Orbitron,monospace';
+  ec.fillStyle='#2a2a30'; ec.textAlign='left';  ec.fillText('0',22,202);
+  ec.textAlign='right';   ec.fillText('9K',318,202);
+  ec.textAlign='center';  ec.fillStyle='#383840'; ec.fillText('RPM',170,202);
+
+  // Throttle bar
+  if (throttle>0.01) {
+    ec.fillStyle='#2a4a30';
+    ec.fillRect(4, 180-Math.round(170*throttle), 7, Math.round(170*throttle));
+  }
+}
+
+/* =====================================================
+   DOM UPDATE HELPER — only write if value changed
+   ===================================================== */
+const _domCache = {};
+function setDom(id, val) {
+  if (_domCache[id] !== val) {
+    _domCache[id] = val;
+    document.getElementById(id).textContent = val;
+  }
+}
+/* OFFSCREEN CACHE — draw static gauge faces once,
+   then each frame just blit + draw needle only
+   ===================================================== */
+const _faceCache = {};
+
+function getOrBuildFace(cacheKey, buildFn) {
+  if (!_faceCache[cacheKey]) {
+    _faceCache[cacheKey] = buildFn();
+  }
+  return _faceCache[cacheKey];
+}
+
+/* Build big gauge face into offscreen canvas */
+function buildRoundFace(min, max, redFrom, unit) {
+  const W=220, H=220, cx=110, cy=115, r=90;
+  const oc = document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const c = oc.getContext('2d');
+
+  const startA = 225*Math.PI/180;
+  const sweep  = 270*Math.PI/180;
+
+  // Chrome bezel
+  const bezGrad = c.createRadialGradient(cx-10,cy-10,r+8,cx,cy,r+20);
+  bezGrad.addColorStop(0,'#7a6040');
+  bezGrad.addColorStop(0.3,'#c8a870');
+  bezGrad.addColorStop(0.55,'#f0d8a0');
+  bezGrad.addColorStop(0.7,'#b89050');
+  bezGrad.addColorStop(1,'#5a4020');
+  c.beginPath(); c.arc(cx,cy,r+20,0,Math.PI*2);
+  c.fillStyle=bezGrad; c.fill();
+
+  // Knurling
+  c.save();
+  c.beginPath(); c.arc(cx,cy,r+20,0,Math.PI*2); c.clip();
+  for(let a=0;a<Math.PI*2;a+=Math.PI/36){
+    c.beginPath();
+    c.moveTo(cx+Math.cos(a)*(r+8), cy+Math.sin(a)*(r+8));
+    c.lineTo(cx+Math.cos(a)*(r+21),cy+Math.sin(a)*(r+21));
+    c.strokeStyle='rgba(0,0,0,0.18)'; c.lineWidth=0.8; c.stroke();
+  }
+  c.restore();
+
+  // Inner shadow ring
+  c.beginPath(); c.arc(cx,cy,r+8,0,Math.PI*2);
+  c.fillStyle='#0a0604'; c.fill();
+  c.strokeStyle='#2a1808'; c.lineWidth=1.5; c.stroke();
+
+  // Black face
+  c.beginPath(); c.arc(cx,cy,r+6,0,Math.PI*2);
+  const faceGrad = c.createRadialGradient(cx,cy,0,cx,cy,r+6);
+  faceGrad.addColorStop(0,'#0e0c0a');
+  faceGrad.addColorStop(0.7,'#080604');
+  faceGrad.addColorStop(1,'#050402');
+  c.fillStyle=faceGrad; c.fill();
+  c.beginPath(); c.arc(cx,cy,r+6,0,Math.PI*2);
+  c.strokeStyle='rgba(200,100,20,0.25)'; c.lineWidth=3; c.stroke();
+
+  // Ticks + numbers
+  const isRPM = unit==='rpm';
+  const totalTicks = 45;
+  for (let i=0; i<=totalTicks; i++) {
+    const ta   = startA + (i/totalTicks)*sweep;
+    const frac = i/totalTicks;
+    const val  = min + frac*(max-min);
+    const isMaj= (i%5===0);
+    const isMid= (i%5===2||i%5===3);
+    const isRed= redFrom!=null && val>=redFrom;
+    const outerR=r+2, innerR=isMaj?r-14:isMid?r-8:r-5;
+    c.beginPath();
+    c.moveTo(cx+Math.cos(ta)*outerR, cy+Math.sin(ta)*outerR);
+    c.lineTo(cx+Math.cos(ta)*innerR, cy+Math.sin(ta)*innerR);
+    c.strokeStyle=isRed?(isMaj?'#ff3020':'#cc2010'):(isMaj?'#e8d8b0':'#6a5030');
+    c.lineWidth=isMaj?2.5:1; c.stroke();
+    if (isMaj) {
+      const lx=cx+Math.cos(ta)*(r-24), ly=cy+Math.sin(ta)*(r-24);
+      const label=isRPM?Math.round(val/1000):Math.round(val);
+      c.font='bold 11px Orbitron,monospace';
+      c.fillStyle=isRed?'#ff5040':'#d8c890';
+      c.textAlign='center'; c.textBaseline='middle';
+      c.fillText(label,lx,ly);
+    }
+  }
+
+  // Redline arc
+  if (redFrom!=null) {
+    const redStartA=startA+((redFrom-min)/(max-min))*sweep;
+    c.beginPath(); c.arc(cx,cy,r+3,redStartA,startA+sweep);
+    c.strokeStyle='rgba(220,30,10,0.7)'; c.lineWidth=3; c.lineCap='butt'; c.stroke();
+  }
+
+  // Unit label
+  c.font='600 8px Rajdhani,sans-serif';
+  c.fillStyle='rgba(200,160,80,0.5)';
+  c.textAlign='center'; c.textBaseline='alphabetic';
+  c.fillText(isRPM?'×1000 r/min':'MPH', cx, cy+r-8);
+
+  return oc;
+}
+
+/* Build small gauge face into offscreen canvas */
+function buildMiniFace(min, max, dangerFrom) {
+  const W=76, H=76, cx=38, cy=40, r=28;
+  const oc = document.createElement('canvas');
+  oc.width=W; oc.height=H;
+  const c = oc.getContext('2d');
+
+  const startA=225*Math.PI/180, sweep=270*Math.PI/180;
+
+  // Chrome bezel
+  const bezGrad = c.createRadialGradient(cx-4,cy-4,r+1,cx,cy,r+10);
+  bezGrad.addColorStop(0,'#907050');
+  bezGrad.addColorStop(0.4,'#d0b070');
+  bezGrad.addColorStop(0.65,'#f0d898');
+  bezGrad.addColorStop(1,'#4a3018');
+  c.beginPath(); c.arc(cx,cy,r+9,0,Math.PI*2);
+  c.fillStyle=bezGrad; c.fill();
+
+  // Black face
+  c.beginPath(); c.arc(cx,cy,r+2,0,Math.PI*2);
+  c.fillStyle='#080604'; c.fill();
+  c.strokeStyle='rgba(180,90,10,0.2)'; c.lineWidth=2; c.stroke();
+
+  // Ticks
+  for (let i=0; i<=20; i++) {
+    const ta=startA+(i/20)*sweep;
+    const val=min+(i/20)*(max-min);
+    const isMaj=(i%4===0);
+    const isD=dangerFrom!=null&&val>=dangerFrom;
+    c.beginPath();
+    c.moveTo(cx+Math.cos(ta)*(r+1), cy+Math.sin(ta)*(r+1));
+    c.lineTo(cx+Math.cos(ta)*(isMaj?r-9:r-5), cy+Math.sin(ta)*(isMaj?r-9:r-5));
+    c.strokeStyle=isD?'#dd2010':(isMaj?'#c8b880':'#504030');
+    c.lineWidth=isMaj?1.5:0.8; c.stroke();
+  }
+
+  // Danger arc
+  if (dangerFrom!=null) {
+    const dA=startA+((dangerFrom-min)/(max-min))*sweep;
+    c.beginPath(); c.arc(cx,cy,r+1,dA,startA+sweep);
+    c.strokeStyle='rgba(200,20,10,0.5)'; c.lineWidth=2; c.lineCap='butt'; c.stroke();
+  }
+
+  return oc;
+}
+
+// Pre-built hub gradient (reused every frame, never recreated)
+let _hubGrad = null;
+function getHubGrad(c, cx, cy) {
+  if (!_hubGrad) {
+    _hubGrad = c.createRadialGradient(cx-3,cy-3,1,cx,cy,14);
+    _hubGrad.addColorStop(0,'#c0a870');
+    _hubGrad.addColorStop(0.5,'#806040');
+    _hubGrad.addColorStop(1,'#201408');
+  }
+  return _hubGrad;
+}
+
+/* =====================================================
+   DRAW — LARGE ROUND GAUGE  (cached face + needle only)
+   ===================================================== */
+function drawRoundGauge(id, value, min, max, redFrom, unit) {
+  const c   = document.getElementById(id).getContext('2d');
+  const W=220, H=220, cx=110, cy=115, r=90;
+  const startA=225*Math.PI/180, sweep=270*Math.PI/180;
+
+  // Blit cached static face
+  const face = getOrBuildFace(`big_${unit}_${redFrom}`, () => buildRoundFace(min,max,redFrom,unit));
+  c.clearRect(0,0,W,H);
+  c.drawImage(face,0,0);
+
+  // Needle only
+  const dispVal = sweepVal(value, min, max);
+  const pct = Math.max(0,Math.min(1,(dispVal-min)/(max-min)));
+  const na  = startA + pct*sweep;
+
+  c.save();
+  c.shadowColor='rgba(0,0,0,0.6)'; c.shadowBlur=4; c.shadowOffsetX=1; c.shadowOffsetY=2;
+  c.beginPath(); c.moveTo(cx+Math.cos(na)*(-16),cy+Math.sin(na)*(-16));
+  c.lineTo(cx+Math.cos(na)*6, cy+Math.sin(na)*6);
+  c.strokeStyle='#800010'; c.lineWidth=4; c.lineCap='round'; c.stroke();
+  c.beginPath(); c.moveTo(cx+Math.cos(na)*6, cy+Math.sin(na)*6);
+  c.lineTo(cx+Math.cos(na)*(r-8), cy+Math.sin(na)*(r-8));
+  c.strokeStyle='#ff2010'; c.lineWidth=2.5; c.lineCap='round'; c.stroke();
+  c.beginPath(); c.moveTo(cx+Math.cos(na)*(r-18),cy+Math.sin(na)*(r-18));
+  c.lineTo(cx+Math.cos(na)*(r-8), cy+Math.sin(na)*(r-8));
+  c.strokeStyle='#ffffff'; c.lineWidth=2.5; c.stroke();
+  c.restore();
+
+  // Chrome hub cap (drawn on top)
+  c.beginPath(); c.arc(cx,cy,14,0,Math.PI*2); c.fillStyle=getHubGrad(c,cx,cy); c.fill();
+  c.strokeStyle='#906830'; c.lineWidth=1.5; c.stroke();
+  c.beginPath(); c.arc(cx,cy,5,0,Math.PI*2); c.fillStyle='#101008'; c.fill();
+}
+
+/* =====================================================
+   DRAW — MINI ROUND GAUGE  (cached face + needle only)
+   ===================================================== */
+function drawMiniGauge(id, value, min, max, dangerFrom) {
+  const c  = document.getElementById(id).getContext('2d');
+  const W=76, H=76, cx=38, cy=40, r=28;
+  const startA=225*Math.PI/180, sweep=270*Math.PI/180;
+
+  const face = getOrBuildFace(`mini_${id}_${dangerFrom}`, () => buildMiniFace(min,max,dangerFrom));
+  c.clearRect(0,0,W,H);
+  c.drawImage(face,0,0);
+
+  // Needle
+  const dispVal = sweepVal(value, min, max);
+  const pct = Math.max(0,Math.min(1,(dispVal-min)/(max-min)));
+  const na  = startA + pct*sweep;
+
+  c.beginPath();
+  c.moveTo(cx+Math.cos(na)*(-8), cy+Math.sin(na)*(-8));
+  c.lineTo(cx+Math.cos(na)*(r-4), cy+Math.sin(na)*(r-4));
+  c.strokeStyle='#ff2010'; c.lineWidth=1.5; c.lineCap='round'; c.stroke();
+  c.beginPath();
+  c.moveTo(cx+Math.cos(na)*(r-9), cy+Math.sin(na)*(r-9));
+  c.lineTo(cx+Math.cos(na)*(r-4), cy+Math.sin(na)*(r-4));
+  c.strokeStyle='#ffffff'; c.lineWidth=1.5; c.stroke();
+
+  // Hub
+  const hg=c.createRadialGradient(cx-1,cy-1,0,cx,cy,6);
+  hg.addColorStop(0,'#b09060'); hg.addColorStop(1,'#201408');
+  c.beginPath(); c.arc(cx,cy,6,0,Math.PI*2); c.fillStyle=hg; c.fill();
+  c.strokeStyle='#806030'; c.lineWidth=1; c.stroke();
+  c.beginPath(); c.arc(cx,cy,2,0,Math.PI*2); c.fillStyle='#100c08'; c.fill();
+}
+
+/* =====================================================
+   DRAW — ALL GAUGES + HUD
+   ===================================================== */
+function drawGauges() {
+  const spd = Math.abs(velocity * 2.23694);
+
+  drawRoundGauge('g-tacho',  dashRPM,   0, MAX_RPM, REDLINE_RPM, 'rpm');
+  drawRoundGauge('g-speedo', dashSpeed, 0, 180,     null,         'mph');
+
+  drawMiniGauge('g-boost', dashBoost, 0, 20, 15);
+  setDom('v-boost', engineOn ? dashBoost.toFixed(1)+' psi' : '--');
+
+  const tempF = dashTemp * 9/5 + 32;
+  drawMiniGauge('g-temp', tempF, 140, 266, 230);
+  setDom('v-temp', engineOn ? Math.round(tempF)+'°F' : '--');
+
+  drawMiniGauge('g-oil', dashOil, 0, 100, 20);
+  setDom('v-oil', engineOn ? Math.round(dashOil)+'%' : '--');
+
+  drawMiniGauge('g-fuel', dashFuel, 0, 100, 15);
+  const fl=['E','1/4','1/2','3/4','F'];
+  setDom('v-fuel', isSweeping||engineOn||actualFuel>0 ? fl[Math.min(4,Math.round(dashFuel/25))] : '--');
+
+  const ignActive = engineOn || isCranking;
+  setDom('mph-display',        ignActive ? Math.round(spd)+''                          : '---');
+  setDom('rpm-digital',        ignActive ? Math.round(dashRPM).toLocaleString()+' RPM' : '--- RPM');
+  setDom('drive-gear-display', (gearIndex===3&&engineOn) ? 'GEAR '+autoGear+' / 8'    : '');
+
+  document.getElementById('w-oil').classList.toggle('on',     engineOn && actualOil < 20);
+  document.getElementById('w-temp').classList.toggle('on',    dashTemp > 112 || isOverheated);
+  document.getElementById('w-fuel').classList.toggle('on',    actualFuel < 10);
+  document.getElementById('w-overheat').classList.toggle('on',isOverheated);
+}
+
+/* =====================================================
+   MAIN LOOP
+   ===================================================== */
+let _lastGaugeRPM=-1, _lastGaugeSpd=-1;
+let _lastEngAngle=-1;
+
+function loop(ts) {
+  const dt = Math.min((ts - lastT) / 1000, 0.05);
+  lastT = ts;
+  update(dt);
+
+  // Engine canvas: only redraw if rotor moved noticeably
+  const angleDiff = Math.abs(rotorAngle - _lastEngAngle);
+  if (angleDiff > 0.01 || _lastEngAngle < 0) {
+    _lastEngAngle = rotorAngle;
+    drawRotaryEngine();
+  }
+
+  // Gauge canvas: only redraw if needles moved
+  if (Math.abs(dashRPM - _lastGaugeRPM) > 15 ||
+      Math.abs(dashSpeed - _lastGaugeSpd) > 0.2 ||
+      isSweeping) {
+    _lastGaugeRPM = dashRPM;
+    _lastGaugeSpd = dashSpeed;
+    drawGauges();
+  }
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(ts => { lastT = ts; loop(ts); });
+
+// Pre-warm gauge face caches so first frame doesn't stutter
+getOrBuildFace(`big_rpm_${REDLINE_RPM}`,  () => buildRoundFace(0, MAX_RPM, REDLINE_RPM, 'rpm'));
+getOrBuildFace(`big_mph_null`,             () => buildRoundFace(0, 180,     null,         'mph'));
+getOrBuildFace(`mini_g-boost_15`,          () => buildMiniFace(0,  20,  15));
+getOrBuildFace(`mini_g-temp_230`,          () => buildMiniFace(140,266, 230));
+getOrBuildFace(`mini_g-oil_20`,            () => buildMiniFace(0,  100, 20));
+getOrBuildFace(`mini_g-fuel_15`,           () => buildMiniFace(0,  100, 15));
+
+updatePRND();
+document.getElementById('sim').focus();
+</script>
+</body>
+</html>
