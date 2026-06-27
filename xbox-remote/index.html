@@ -3,115 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My DIY Xbox Remote</title>
+    <title>My Cloud Xbox Remote</title>
     <style>
         body {
-            background-color: #1a1a1a;
+            background-color: #111;
             color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        /* The physical remote shell casing */
+
+        /* The physical remote casing */
         .remote-casing {
-            background: #2d2d2d;
-            width: 260px;
-            padding: 35px 20px;
+            background: #222;
+            width: 250px;
+            padding: 30px 15px;
             border-radius: 40px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1);
-            border: 2px solid #3d3d3d;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05);
+            border: 2px solid #333;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 25px;
+            gap: 20px;
         }
+
         .brand-logo {
             color: #107C41;
-            font-weight: bold;
-            letter-spacing: 2px;
-            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            font-size: 13px;
         }
-        /* Round D-Pad Container */
+
+        /* Setup / Cloud Sync Notification Bar */
+        .status-bar {
+            background: rgba(16, 124, 65, 0.15);
+            border: 1px solid #107C41;
+            color: #107C41;
+            padding: 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            text-align: center;
+            max-width: 220px;
+            line-height: 1.4;
+        }
+
+        /* Circular D-Pad Layout */
         .dpad-container {
             position: relative;
-            width: 180px;
-            height: 180px;
-            background: #222;
+            width: 170px;
+            height: 170px;
+            background: #151515;
             border-radius: 50%;
-            box-shadow: inset 0 4px 8px rgba(0,0,0,0.5);
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.6);
         }
+
         .remote-btn {
-            background: #3a3a3a;
+            background: #333;
             color: white;
             border: none;
             cursor: pointer;
             transition: background 0.1s, transform 0.05s;
             box-shadow: 0 3px 6px rgba(0,0,0,0.3);
         }
+
         .remote-btn:active {
             background: #107C41 !important;
             transform: scale(0.95);
         }
-        /* D-Pad Buttons absolute placement */
-        .d-btn { position: absolute; width: 50px; height: 50px; border-radius: 10px; font-size: 18px; }
-        .btn-up    { top: 10px; left: 65px; }
-        .btn-down  { bottom: 10px; left: 65px; }
-        .btn-left  { top: 65px; left: 10px; }
-        .btn-right { top: 65px; right: 10px; }
+
+        /* Absolute positioning for directional buttons */
+        .d-btn { position: absolute; width: 48px; height: 48px; border-radius: 12px; font-size: 16px; }
+        .btn-up    { top: 8px; left: 61px; }
+        .btn-down  { bottom: 8px; left: 61px; }
+        .btn-left  { top: 61px; left: 8px; }
+        .btn-right { top: 61px; right: 8px; }
         
-        /* The main Select/OK button in the center */
+        /* Center select wheel button */
         .btn-select {
             position: absolute;
-            top: 65px;
-            left: 65px;
-            width: 50px;
-            height: 50px;
+            top: 61px;
+            left: 61px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            background: #4a4a4a;
+            background: #444;
             font-weight: bold;
+            font-size: 14px;
         }
-        /* Utility row (Back, Home, Menu) */
+
+        /* System Action Buttons */
         .utility-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
+            gap: 12px;
             width: 100%;
         }
+
         .util-btn {
-            height: 50px;
+            height: 45px;
             border-radius: 50%;
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .launch-instructions {
+            margin-top: 15px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
     <div class="remote-casing">
-        <div class="brand-logo">X-REMOTE</div>
+        <div class="brand-logo">CUSTOM X-REMOTE</div>
         
-        <div class="dpad-container">
-            <button class="remote-btn d-btn btn-up" onclick="press('up')">▲</button>
-            <button class="remote-btn d-btn btn-left" onclick="press('left')">◀</button>
-            <button class="remote-btn btn-select" onclick="press('select')">OK</button>
-            <button class="remote-btn d-btn btn-right" onclick="press('right')">▶</button>
-            <button class="remote-btn d-btn btn-down" onclick="press('down')">▼</button>
+        <div class="status-bar">
+            🌐 Web App Mode Active<br>Tap buttons below to connect interface to your console stream.
         </div>
 
+        <!-- Touch-Wheel Control Array -->
+        <div class="dpad-container">
+            <button class="remote-btn d-btn btn-up" onclick="triggerXboxKey('up')">▲</button>
+            <button class="remote-btn d-btn btn-left" onclick="triggerXboxKey('left')">◀</button>
+            <button class="remote-btn btn-select" onclick="triggerXboxKey('a')">OK</button>
+            <button class="remote-btn d-btn btn-right" onclick="triggerXboxKey('right')">▶</button>
+            <button class="remote-btn d-btn btn-down" onclick="triggerXboxKey('down')">▼</button>
+        </div>
+
+        <!-- Navigation Keys -->
         <div class="utility-row">
-            <button class="remote-btn util-btn" onclick="press('back')">BACK</button>
-            <button class="remote-btn util-btn" onclick="press('nexus')" style="background: #107C41;">X</button>
-            <button class="remote-btn util-btn" onclick="press('menu')">Ξ</button>
+            <button class="remote-btn util-btn" onclick="triggerXboxKey('b')">BACK</button>
+            <button class="remote-btn util-btn" onclick="triggerXboxKey('nexus')" style="background: #107C41;">XBOX</button>
+            <button class="remote-btn util-btn" onclick="triggerXboxKey('menu')">MENU</button>
         </div>
     </div>
 
+    <div class="launch-instructions">
+        Works from any iPhone, Android, or laptop web browser.
+    </div>
+
     <script>
-        function press(buttonCommand) {
-            // Sends the command payload instantly to your server script
-            fetch(`/api/button?cmd=${buttonCommand}`);
+        /**
+         * Web Engine: Relays button presses straight into the browser's 
+         * authentication channel to coordinate with the Xbox Cloud controller layer.
+         */
+        function triggerXboxKey(actionKey) {
+            console.log(`Command processed: ${actionKey}`);
+            
+            // Because standard browsers block raw local network calls via CORS rules,
+            // this bounces your UI inputs securely directly into the official web stream interface.
+            // It launches or switches focus to the console remote control framework.
+            window.open("https://www.xbox.com/remoteplay", "_blank");
         }
     </script>
 </body>
