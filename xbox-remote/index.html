@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My DIY Xbox Remote</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        /* The physical remote shell casing */
+        .remote-casing {
+            background: #2d2d2d;
+            width: 260px;
+            padding: 35px 20px;
+            border-radius: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1);
+            border: 2px solid #3d3d3d;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+        .brand-logo {
+            color: #107C41;
+            font-weight: bold;
+            letter-spacing: 2px;
+            font-size: 14px;
+        }
+        /* Round D-Pad Container */
+        .dpad-container {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            background: #222;
+            border-radius: 50%;
+            box-shadow: inset 0 4px 8px rgba(0,0,0,0.5);
+        }
+        .remote-btn {
+            background: #3a3a3a;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.1s, transform 0.05s;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        .remote-btn:active {
+            background: #107C41 !important;
+            transform: scale(0.95);
+        }
+        /* D-Pad Buttons absolute placement */
+        .d-btn { position: absolute; width: 50px; height: 50px; border-radius: 10px; font-size: 18px; }
+        .btn-up    { top: 10px; left: 65px; }
+        .btn-down  { bottom: 10px; left: 65px; }
+        .btn-left  { top: 65px; left: 10px; }
+        .btn-right { top: 65px; right: 10px; }
+        
+        /* The main Select/OK button in the center */
+        .btn-select {
+            position: absolute;
+            top: 65px;
+            left: 65px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #4a4a4a;
+            font-weight: bold;
+        }
+        /* Utility row (Back, Home, Menu) */
+        .utility-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+        }
+        .util-btn {
+            height: 50px;
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="remote-casing">
+        <div class="brand-logo">X-REMOTE</div>
+        
+        <div class="dpad-container">
+            <button class="remote-btn d-btn btn-up" onclick="press('up')">▲</button>
+            <button class="remote-btn d-btn btn-left" onclick="press('left')">◀</button>
+            <button class="remote-btn btn-select" onclick="press('select')">OK</button>
+            <button class="remote-btn d-btn btn-right" onclick="press('right')">▶</button>
+            <button class="remote-btn d-btn btn-down" onclick="press('down')">▼</button>
+        </div>
+
+        <div class="utility-row">
+            <button class="remote-btn util-btn" onclick="press('back')">BACK</button>
+            <button class="remote-btn util-btn" onclick="press('nexus')" style="background: #107C41;">X</button>
+            <button class="remote-btn util-btn" onclick="press('menu')">Ξ</button>
+        </div>
+    </div>
+
+    <script>
+        function press(buttonCommand) {
+            // Sends the command payload instantly to your server script
+            fetch(`/api/button?cmd=${buttonCommand}`);
+        }
+    </script>
+</body>
+</html>
